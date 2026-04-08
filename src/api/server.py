@@ -15,8 +15,10 @@ from fastapi.middleware.cors import CORSMiddleware
 
 from src.api.auth import verify_token
 from src.api.events import EventBus
+from src.api.routes import config as config_routes
 from src.api.routes import meetings as meetings_routes
 from src.api.routes import status as status_routes
+from src.utils.config import DEFAULT_CONFIG_PATH
 from src.api.websocket import ConnectionManager
 from src.db.database import Database
 from src.db.repository import MeetingRepository
@@ -79,11 +81,13 @@ class ApiServer:
         # Initialise route dependencies.
         status_routes.init(self._get_daemon_state, self._get_active_meeting)
         meetings_routes.init(self.repo)
+        config_routes.init(DEFAULT_CONFIG_PATH)
 
         # Register REST routers with auth dependency.
         auth_deps = [Depends(verify_token)]
         app.include_router(status_routes.router, dependencies=auth_deps)
         app.include_router(meetings_routes.router, dependencies=auth_deps)
+        app.include_router(config_routes.router, dependencies=auth_deps)
 
         # WebSocket endpoint (no auth — the UI running on localhost is trusted).
         @app.websocket("/ws")

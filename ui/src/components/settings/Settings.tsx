@@ -1,5 +1,79 @@
+import { useState, useEffect } from "react";
+import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
+import { getConfig, updateConfig } from "../../lib/api";
 import { useDaemonStatus } from "../../hooks/useDaemonStatus";
 import { useAppStore } from "../../stores/appStore";
+import type { AppConfig } from "../../lib/types";
+
+/* ------------------------------------------------------------------ */
+/*  Reusable form primitives                                          */
+/* ------------------------------------------------------------------ */
+
+function Toggle({
+  checked,
+  onChange,
+}: {
+  checked: boolean;
+  onChange: (v: boolean) => void;
+}) {
+  return (
+    <button
+      type="button"
+      role="switch"
+      aria-checked={checked}
+      onClick={() => onChange(!checked)}
+      className={`relative inline-flex h-5 w-9 shrink-0 items-center rounded-full transition-colors ${
+        checked ? "bg-accent" : "bg-border"
+      }`}
+    >
+      <span
+        className={`inline-block h-3.5 w-3.5 rounded-full bg-white transition-transform ${
+          checked ? "translate-x-[18px]" : "translate-x-[2px]"
+        }`}
+      />
+    </button>
+  );
+}
+
+function Field({
+  label,
+  help,
+  children,
+}: {
+  label: string;
+  help?: string;
+  children: React.ReactNode;
+}) {
+  return (
+    <div className="flex items-start justify-between gap-4 py-3">
+      <div className="min-w-0 pt-1">
+        <div className="text-sm text-text-primary">{label}</div>
+        {help && <p className="text-xs text-text-muted mt-0.5">{help}</p>}
+      </div>
+      <div className="shrink-0">{children}</div>
+    </div>
+  );
+}
+
+function Section({
+  title,
+  description,
+  children,
+}: {
+  title: string;
+  description?: string;
+  children: React.ReactNode;
+}) {
+  return (
+    <div className="rounded-xl bg-surface-raised border border-border p-5">
+      <h2 className="text-sm font-medium text-text-primary">{title}</h2>
+      {description && (
+        <p className="text-xs text-text-muted mt-1">{description}</p>
+      )}
+      <div className="divide-y divide-border mt-3">{children}</div>
+    </div>
+  );
+}
 
 function InfoRow({ label, value }: { label: string; value: string }) {
   return (
@@ -10,52 +84,736 @@ function InfoRow({ label, value }: { label: string; value: string }) {
   );
 }
 
-function Section({
-  title,
-  children,
-}: {
-  title: string;
-  children: React.ReactNode;
-}) {
-  return (
-    <div className="rounded-xl bg-surface-raised border border-border p-5">
-      <h2 className="text-sm font-medium text-text-primary mb-3">{title}</h2>
-      <div className="divide-y divide-border">{children}</div>
-    </div>
-  );
-}
+const INPUT =
+  "bg-surface border border-border rounded-lg px-3 py-1.5 text-sm text-text-primary focus:outline-none focus:border-accent";
+const NUM = `${INPUT} w-24 text-right`;
+const TEXT = `${INPUT} w-48`;
+const WIDE = `${INPUT} w-64`;
+const SELECT = `${INPUT} appearance-none cursor-pointer pr-7`;
+
+/* ------------------------------------------------------------------ */
+/*  Main component                                                    */
+/* ------------------------------------------------------------------ */
 
 export function Settings() {
   const { daemonRunning, state } = useDaemonStatus();
   const wsConnected = useAppStore((s) => s.wsConnected);
+  const queryClient = useQueryClient();
+
+  const { data: fetchedConfig, isLoading: configLoading } = useQuery({
+    queryKey: ["config"],
+    queryFn: getConfig,
+    enabled: daemonRunning,
+  });
+
+  const [form, setForm] = useState<AppConfig | null>(null);
+  const [savedConfig, setSavedConfig] = useState<AppConfig | null>(null);
+  const [showRestart, setShowRestart] = useState(false);
+  const [showSecrets, setShowSecrets] = useState<Record<string, boolean>>({});
+
+  useEffect(() => {
+    if (fetchedConfig && !form) {
+      setForm(fetchedConfig);
+      setSavedConfig(fetchedConfig);
+    }
+  }, [fetchedConfig, form]);
+
+  const saveMutation = useMutation({
+    mutationFn: (config: Partial<AppConfig>) => updateConfig(config),
+    onSuccess: (data) => {
+      queryClient.setQueryData(["config"], data);
+      setForm(data);
+      setSavedConfig(data);
+      setShowRestart(true);
+    },
+  });
+
+  const isDirty =
+    form !== null &&
+    savedConfig !== null &&
+    JSON.stringify(form) !== JSON.stringify(savedConfig);
+
+  function set<S extends keyof AppConfig>(
+    section: S,
+    key: string,
+    value: unknown,
+  ) {
+    setForm((prev) => {
+      if (!prev) return prev;
+      return {
+        ...prev,
+        [section]: { ...prev[section], [key]: value },
+      };
+    });
+  }
+
+  function setNotionProp(key: string, value: string) {
+    setForm((prev) => {
+      if (!prev) return prev;
+      return {
+        ...prev,
+        notion: {
+          ...prev.notion,
+          properties: { ...prev.notion.properties, [key]: value },
+        },
+      };
+    });
+  }
+
+  const toggleSecret = (key: string) =>
+    setShowSecrets((prev) => ({ ...prev, [key]: !prev[key] }));
 
   return (
     <div className="flex flex-col gap-4 p-6 max-w-3xl">
-      <h1 className="text-lg font-semibold text-text-primary">Settings</h1>
+      {/* Header */}
+      <div className="flex items-center justify-between">
+        <h1 className="text-lg font-semibold text-text-primary">Settings</h1>
+        {form && (
+          <button
+            onClick={() => form && saveMutation.mutate(form)}
+            disabled={!isDirty || saveMutation.isPending}
+            className={`px-4 py-1.5 rounded-lg text-sm font-medium transition-colors ${
+              isDirty
+                ? "bg-accent text-white hover:bg-accent-hover"
+                : "bg-surface-raised text-text-muted border border-border cursor-not-allowed"
+            }`}
+          >
+            {saveMutation.isPending ? "Saving..." : "Save Changes"}
+          </button>
+        )}
+      </div>
 
-      <Section title="Daemon">
-        <InfoRow label="Status" value={daemonRunning ? "Running" : "Offline"} />
-        <InfoRow label="State" value={state} />
-        <InfoRow label="WebSocket" value={wsConnected ? "Connected" : "Disconnected"} />
-        <InfoRow label="API" value="http://127.0.0.1:9876" />
-      </Section>
-
-      <Section title="Storage">
-        <InfoRow label="Database" value="~/.local/share/meetingmind/meetings.db" />
-        <InfoRow label="Audio" value="~/.local/share/meetingmind/audio/" />
-        <InfoRow label="Auth token" value="~/.config/meetingmind/auth_token" />
-        <InfoRow label="Logs" value="~/Library/Logs/meetingmind.log" />
-      </Section>
-
-      <Section title="Configuration">
-        <div className="py-3">
-          <p className="text-sm text-text-secondary">
-            Edit <code className="text-xs px-1.5 py-0.5 rounded bg-surface border border-border font-mono">config.yaml</code> in the project root to change settings.
+      {/* Restart banner */}
+      {showRestart && (
+        <div className="rounded-lg bg-amber-400/10 border border-amber-400/30 px-4 py-3 flex items-center justify-between">
+          <p className="text-sm text-amber-300">
+            Settings saved. Restart the daemon for changes to take effect.
           </p>
-          <p className="text-xs text-text-muted mt-2">
-            Restart the daemon after making changes.
+          <button
+            onClick={() => setShowRestart(false)}
+            className="text-amber-300/60 hover:text-amber-300 text-sm ml-4"
+          >
+            Dismiss
+          </button>
+        </div>
+      )}
+
+      {/* Error banner */}
+      {saveMutation.isError && (
+        <div className="rounded-lg bg-status-error/10 border border-status-error/30 px-4 py-3">
+          <p className="text-sm text-status-error">
+            Failed to save: {(saveMutation.error as Error).message}
           </p>
         </div>
+      )}
+
+      {/* Config form */}
+      {!daemonRunning ? (
+        <Section title="Configuration">
+          <div className="py-3">
+            <p className="text-sm text-text-secondary">
+              Start the daemon to manage settings.
+            </p>
+            <p className="text-xs text-text-muted mt-2">
+              You can also edit{" "}
+              <code className="px-1.5 py-0.5 rounded bg-surface border border-border font-mono text-xs">
+                config.yaml
+              </code>{" "}
+              directly.
+            </p>
+          </div>
+        </Section>
+      ) : configLoading || !form ? (
+        <Section title="Configuration">
+          <div className="py-3">
+            <p className="text-sm text-text-muted">
+              Loading configuration...
+            </p>
+          </div>
+        </Section>
+      ) : (
+        <>
+          {/* Detection */}
+          <Section
+            title="Meeting Detection"
+            description="When and how meetings are detected"
+          >
+            <Field
+              label="Poll interval"
+              help="How often to check for an active meeting"
+            >
+              <div className="flex items-center gap-2">
+                <input
+                  type="number"
+                  min={1}
+                  max={60}
+                  value={form.detection.poll_interval_seconds}
+                  onChange={(e) =>
+                    set("detection", "poll_interval_seconds", Number(e.target.value))
+                  }
+                  className={NUM}
+                />
+                <span className="text-xs text-text-muted">sec</span>
+              </div>
+            </Field>
+            <Field
+              label="Minimum duration"
+              help="Ignore meetings shorter than this"
+            >
+              <div className="flex items-center gap-2">
+                <input
+                  type="number"
+                  min={0}
+                  max={600}
+                  value={form.detection.min_meeting_duration_seconds}
+                  onChange={(e) =>
+                    set(
+                      "detection",
+                      "min_meeting_duration_seconds",
+                      Number(e.target.value),
+                    )
+                  }
+                  className={NUM}
+                />
+                <span className="text-xs text-text-muted">sec</span>
+              </div>
+            </Field>
+            <Field
+              label="Consecutive detections"
+              help="Positive polls required before recording starts"
+            >
+              <input
+                type="number"
+                min={1}
+                max={10}
+                value={form.detection.required_consecutive_detections}
+                onChange={(e) =>
+                  set(
+                    "detection",
+                    "required_consecutive_detections",
+                    Number(e.target.value),
+                  )
+                }
+                className={NUM}
+              />
+            </Field>
+            <Field
+              label="Process names"
+              help="Comma-separated names to monitor"
+            >
+              <input
+                type="text"
+                value={(form.detection.process_names ?? []).join(", ")}
+                onChange={(e) =>
+                  set(
+                    "detection",
+                    "process_names",
+                    e.target.value
+                      .split(",")
+                      .map((s) => s.trim())
+                      .filter(Boolean),
+                  )
+                }
+                className={WIDE}
+              />
+            </Field>
+          </Section>
+
+          {/* Audio */}
+          <Section
+            title="Audio Capture"
+            description="Audio device and recording settings"
+          >
+            <Field
+              label="BlackHole device"
+              help="Virtual audio device name from Audio MIDI Setup"
+            >
+              <input
+                type="text"
+                value={form.audio.blackhole_device_name}
+                onChange={(e) =>
+                  set("audio", "blackhole_device_name", e.target.value)
+                }
+                className={TEXT}
+              />
+            </Field>
+            <Field
+              label="Microphone"
+              help="Device name substring, empty for system default"
+            >
+              <input
+                type="text"
+                value={form.audio.mic_device_name}
+                onChange={(e) =>
+                  set("audio", "mic_device_name", e.target.value)
+                }
+                placeholder="System default"
+                className={TEXT}
+              />
+            </Field>
+            <Field
+              label="Enable microphone"
+              help="Mix mic input with system audio"
+            >
+              <Toggle
+                checked={form.audio.mic_enabled}
+                onChange={(v) => set("audio", "mic_enabled", v)}
+              />
+            </Field>
+            <Field label="Mic volume" help="0.0 to 2.0">
+              <input
+                type="number"
+                min={0}
+                max={2}
+                step={0.1}
+                value={form.audio.mic_volume}
+                onChange={(e) =>
+                  set("audio", "mic_volume", Number(e.target.value))
+                }
+                className={NUM}
+              />
+            </Field>
+            <Field label="System volume" help="0.0 to 2.0">
+              <input
+                type="number"
+                min={0}
+                max={2}
+                step={0.1}
+                value={form.audio.system_volume}
+                onChange={(e) =>
+                  set("audio", "system_volume", Number(e.target.value))
+                }
+                className={NUM}
+              />
+            </Field>
+            <Field label="Sample rate" help="Hz (16000 optimal for speech)">
+              <select
+                value={form.audio.sample_rate}
+                onChange={(e) =>
+                  set("audio", "sample_rate", Number(e.target.value))
+                }
+                className={SELECT}
+              >
+                <option value={16000}>16,000</option>
+                <option value={44100}>44,100</option>
+                <option value={48000}>48,000</option>
+              </select>
+            </Field>
+            <Field
+              label="Keep source files"
+              help="Retain separate system/mic WAVs after merging"
+            >
+              <Toggle
+                checked={form.audio.keep_source_files}
+                onChange={(v) => set("audio", "keep_source_files", v)}
+              />
+            </Field>
+          </Section>
+
+          {/* Transcription */}
+          <Section
+            title="Transcription"
+            description="Whisper model and inference settings"
+          >
+            <Field
+              label="Model"
+              help="Larger models are more accurate but slower"
+            >
+              <select
+                value={form.transcription.model_size}
+                onChange={(e) =>
+                  set("transcription", "model_size", e.target.value)
+                }
+                className={SELECT}
+              >
+                <option value="tiny.en">tiny.en</option>
+                <option value="base.en">base.en</option>
+                <option value="small.en">small.en</option>
+                <option value="medium.en">medium.en</option>
+                <option value="large-v3">large-v3</option>
+              </select>
+            </Field>
+            <Field label="Compute type">
+              <select
+                value={form.transcription.compute_type}
+                onChange={(e) =>
+                  set("transcription", "compute_type", e.target.value)
+                }
+                className={SELECT}
+              >
+                <option value="auto">auto</option>
+                <option value="cpu">cpu</option>
+              </select>
+            </Field>
+            <Field label="Language">
+              <select
+                value={form.transcription.language}
+                onChange={(e) =>
+                  set("transcription", "language", e.target.value)
+                }
+                className={SELECT}
+              >
+                <option value="en">English</option>
+                <option value="auto">Auto-detect</option>
+              </select>
+            </Field>
+            <Field label="CPU threads" help="0 for auto-detect">
+              <input
+                type="number"
+                min={0}
+                max={32}
+                value={form.transcription.cpu_threads}
+                onChange={(e) =>
+                  set("transcription", "cpu_threads", Number(e.target.value))
+                }
+                className={NUM}
+              />
+            </Field>
+            <Field
+              label="VAD threshold"
+              help="0.0–1.0 (lower keeps more audio)"
+            >
+              <input
+                type="number"
+                min={0}
+                max={1}
+                step={0.05}
+                value={form.transcription.vad_threshold}
+                onChange={(e) =>
+                  set("transcription", "vad_threshold", Number(e.target.value))
+                }
+                className={NUM}
+              />
+            </Field>
+          </Section>
+
+          {/* Summarisation */}
+          <Section
+            title="Summarisation"
+            description="AI backend for generating meeting summaries"
+          >
+            <Field label="Backend">
+              <select
+                value={form.summarisation.backend}
+                onChange={(e) =>
+                  set("summarisation", "backend", e.target.value)
+                }
+                className={SELECT}
+              >
+                <option value="ollama">Ollama (local)</option>
+                <option value="claude">Claude (API)</option>
+              </select>
+            </Field>
+
+            {form.summarisation.backend === "ollama" ? (
+              <>
+                <Field label="Ollama URL" help="Base URL of the Ollama server">
+                  <input
+                    type="text"
+                    value={form.summarisation.ollama_base_url}
+                    onChange={(e) =>
+                      set("summarisation", "ollama_base_url", e.target.value)
+                    }
+                    className={WIDE}
+                  />
+                </Field>
+                <Field label="Ollama model">
+                  <input
+                    type="text"
+                    value={form.summarisation.ollama_model}
+                    onChange={(e) =>
+                      set("summarisation", "ollama_model", e.target.value)
+                    }
+                    className={TEXT}
+                  />
+                </Field>
+              </>
+            ) : (
+              <>
+                <Field label="API key">
+                  <div className="flex items-center gap-2">
+                    <input
+                      type={showSecrets["anthropic"] ? "text" : "password"}
+                      value={form.summarisation.anthropic_api_key}
+                      onChange={(e) =>
+                        set(
+                          "summarisation",
+                          "anthropic_api_key",
+                          e.target.value,
+                        )
+                      }
+                      className={TEXT}
+                    />
+                    <button
+                      type="button"
+                      onClick={() => toggleSecret("anthropic")}
+                      className="text-xs text-text-muted hover:text-text-secondary"
+                    >
+                      {showSecrets["anthropic"] ? "Hide" : "Show"}
+                    </button>
+                  </div>
+                </Field>
+                <Field label="Model" help="Claude model ID">
+                  <input
+                    type="text"
+                    value={form.summarisation.model}
+                    onChange={(e) =>
+                      set("summarisation", "model", e.target.value)
+                    }
+                    className={TEXT}
+                  />
+                </Field>
+              </>
+            )}
+
+            <Field label="Max tokens" help="Maximum summary response length">
+              <input
+                type="number"
+                min={256}
+                max={16384}
+                step={256}
+                value={form.summarisation.max_tokens}
+                onChange={(e) =>
+                  set("summarisation", "max_tokens", Number(e.target.value))
+                }
+                className={NUM}
+              />
+            </Field>
+          </Section>
+
+          {/* Diarisation */}
+          <Section
+            title="Speaker Diarisation"
+            description="Energy-based speaker identification"
+          >
+            <Field
+              label="Enabled"
+              help="Requires microphone enabled for dual-source recording"
+            >
+              <Toggle
+                checked={form.diarisation.enabled}
+                onChange={(v) => set("diarisation", "enabled", v)}
+              />
+            </Field>
+            {form.diarisation.enabled && (
+              <>
+                <Field
+                  label="Your name"
+                  help="Label for the local speaker"
+                >
+                  <input
+                    type="text"
+                    value={form.diarisation.speaker_name}
+                    onChange={(e) =>
+                      set("diarisation", "speaker_name", e.target.value)
+                    }
+                    className={TEXT}
+                  />
+                </Field>
+                <Field label="Remote label">
+                  <input
+                    type="text"
+                    value={form.diarisation.remote_label}
+                    onChange={(e) =>
+                      set("diarisation", "remote_label", e.target.value)
+                    }
+                    className={TEXT}
+                  />
+                </Field>
+                <Field
+                  label="Energy threshold"
+                  help="How much louder one source must be (0.1–5.0)"
+                >
+                  <input
+                    type="number"
+                    min={0.1}
+                    max={5}
+                    step={0.1}
+                    value={form.diarisation.energy_ratio_threshold}
+                    onChange={(e) =>
+                      set(
+                        "diarisation",
+                        "energy_ratio_threshold",
+                        Number(e.target.value),
+                      )
+                    }
+                    className={NUM}
+                  />
+                </Field>
+              </>
+            )}
+          </Section>
+
+          {/* Markdown output */}
+          <Section
+            title="Markdown Output"
+            description="Write summaries to an Obsidian vault"
+          >
+            <Field label="Enabled">
+              <Toggle
+                checked={form.markdown.enabled}
+                onChange={(v) => set("markdown", "enabled", v)}
+              />
+            </Field>
+            {form.markdown.enabled && (
+              <>
+                <Field
+                  label="Vault path"
+                  help="Absolute path to the output folder"
+                >
+                  <input
+                    type="text"
+                    value={form.markdown.vault_path}
+                    onChange={(e) =>
+                      set("markdown", "vault_path", e.target.value)
+                    }
+                    className={WIDE}
+                  />
+                </Field>
+                <Field
+                  label="Filename template"
+                  help="Variables: {date}, {time}, {slug}"
+                >
+                  <input
+                    type="text"
+                    value={form.markdown.filename_template}
+                    onChange={(e) =>
+                      set("markdown", "filename_template", e.target.value)
+                    }
+                    className={TEXT}
+                  />
+                </Field>
+                <Field label="Include transcript">
+                  <Toggle
+                    checked={form.markdown.include_full_transcript}
+                    onChange={(v) =>
+                      set("markdown", "include_full_transcript", v)
+                    }
+                  />
+                </Field>
+              </>
+            )}
+          </Section>
+
+          {/* Notion output */}
+          <Section
+            title="Notion Output"
+            description="Create meeting pages in a Notion database"
+          >
+            <Field label="Enabled">
+              <Toggle
+                checked={form.notion.enabled}
+                onChange={(v) => set("notion", "enabled", v)}
+              />
+            </Field>
+            {form.notion.enabled && (
+              <>
+                <Field label="API key">
+                  <div className="flex items-center gap-2">
+                    <input
+                      type={showSecrets["notion"] ? "text" : "password"}
+                      value={form.notion.api_key}
+                      onChange={(e) =>
+                        set("notion", "api_key", e.target.value)
+                      }
+                      className={TEXT}
+                    />
+                    <button
+                      type="button"
+                      onClick={() => toggleSecret("notion")}
+                      className="text-xs text-text-muted hover:text-text-secondary"
+                    >
+                      {showSecrets["notion"] ? "Hide" : "Show"}
+                    </button>
+                  </div>
+                </Field>
+                <Field
+                  label="Database ID"
+                  help="From the Notion database URL"
+                >
+                  <input
+                    type="text"
+                    value={form.notion.database_id}
+                    onChange={(e) =>
+                      set("notion", "database_id", e.target.value)
+                    }
+                    className={WIDE}
+                  />
+                </Field>
+                <Field label="Title property">
+                  <input
+                    type="text"
+                    value={form.notion.properties?.title ?? "Name"}
+                    onChange={(e) => setNotionProp("title", e.target.value)}
+                    className={TEXT}
+                  />
+                </Field>
+                <Field label="Date property">
+                  <input
+                    type="text"
+                    value={form.notion.properties?.date ?? "Date"}
+                    onChange={(e) => setNotionProp("date", e.target.value)}
+                    className={TEXT}
+                  />
+                </Field>
+                <Field label="Tags property">
+                  <input
+                    type="text"
+                    value={form.notion.properties?.tags ?? "Tags"}
+                    onChange={(e) => setNotionProp("tags", e.target.value)}
+                    className={TEXT}
+                  />
+                </Field>
+                <Field label="Status property">
+                  <input
+                    type="text"
+                    value={form.notion.properties?.status ?? "Status"}
+                    onChange={(e) => setNotionProp("status", e.target.value)}
+                    className={TEXT}
+                  />
+                </Field>
+              </>
+            )}
+          </Section>
+
+          {/* Logging */}
+          <Section title="Logging">
+            <Field label="Log level">
+              <select
+                value={form.logging.level}
+                onChange={(e) => set("logging", "level", e.target.value)}
+                className={SELECT}
+              >
+                <option value="DEBUG">DEBUG</option>
+                <option value="INFO">INFO</option>
+                <option value="WARNING">WARNING</option>
+                <option value="ERROR">ERROR</option>
+              </select>
+            </Field>
+            <Field label="Log file">
+              <input
+                type="text"
+                value={form.logging.log_file}
+                onChange={(e) => set("logging", "log_file", e.target.value)}
+                className={WIDE}
+              />
+            </Field>
+          </Section>
+        </>
+      )}
+
+      {/* Read-only info */}
+      <Section title="Daemon">
+        <InfoRow
+          label="Status"
+          value={daemonRunning ? "Running" : "Offline"}
+        />
+        <InfoRow label="State" value={state} />
+        <InfoRow
+          label="WebSocket"
+          value={wsConnected ? "Connected" : "Disconnected"}
+        />
+        <InfoRow label="API" value="http://127.0.0.1:9876" />
       </Section>
 
       <Section title="About">

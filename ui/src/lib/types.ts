@@ -57,6 +57,88 @@ export interface TranscriptSegment {
   speaker: string;
 }
 
+/** Application config sections matching config.yaml. */
+
+export interface DetectionConfig {
+  poll_interval_seconds: number;
+  min_meeting_duration_seconds: number;
+  required_consecutive_detections: number;
+  process_names: string[];
+}
+
+export interface AudioConfig {
+  blackhole_device_name: string;
+  mic_device_name: string;
+  mic_enabled: boolean;
+  mic_volume: number;
+  system_volume: number;
+  sample_rate: number;
+  channels: number;
+  temp_audio_dir: string;
+  keep_source_files: boolean;
+}
+
+export interface TranscriptionConfig {
+  model_size: string;
+  compute_type: string;
+  language: string;
+  cpu_threads: number;
+  vad_threshold: number;
+}
+
+export interface SummarisationConfig {
+  backend: "ollama" | "claude";
+  anthropic_api_key: string;
+  model: string;
+  max_tokens: number;
+  ollama_base_url: string;
+  ollama_model: string;
+}
+
+export interface DiarisationConfig {
+  enabled: boolean;
+  speaker_name: string;
+  remote_label: string;
+  energy_ratio_threshold: number;
+}
+
+export interface MarkdownConfig {
+  enabled: boolean;
+  vault_path: string;
+  filename_template: string;
+  include_full_transcript: boolean;
+}
+
+export interface NotionConfig {
+  enabled: boolean;
+  api_key: string;
+  database_id: string;
+  properties: Record<string, string>;
+}
+
+export interface LoggingConfig {
+  level: string;
+  log_file: string;
+}
+
+export interface ApiConfig {
+  enabled: boolean;
+  host: string;
+  port: number;
+}
+
+export interface AppConfig {
+  detection: DetectionConfig;
+  audio: AudioConfig;
+  transcription: TranscriptionConfig;
+  summarisation: SummarisationConfig;
+  diarisation: DiarisationConfig;
+  markdown: MarkdownConfig;
+  notion: NotionConfig;
+  logging: LoggingConfig;
+  api: ApiConfig;
+}
+
 /** WebSocket event types pushed from the daemon. */
 export type WSEvent =
   | { type: "meeting.detecting"; consecutive: number; required: number }

@@ -1,6 +1,6 @@
 /** API client for communicating with the MeetingMind daemon. */
 
-import type { HealthResponse, MeetingsResponse, Meeting, StatusResponse } from "./types";
+import type { AppConfig, HealthResponse, MeetingsResponse, Meeting, StatusResponse } from "./types";
 
 const API_BASE = "http://127.0.0.1:9876";
 
@@ -57,4 +57,15 @@ export async function getMeeting(id: string): Promise<Meeting> {
 
 export async function deleteMeeting(id: string): Promise<void> {
   await request(`/api/meetings/${id}`, { method: "DELETE" });
+}
+
+export async function getConfig(): Promise<AppConfig> {
+  return request<AppConfig>("/api/config");
+}
+
+export async function updateConfig(config: Partial<AppConfig>): Promise<AppConfig> {
+  return request<AppConfig>("/api/config", {
+    method: "PUT",
+    body: JSON.stringify(config),
+  });
 }
