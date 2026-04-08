@@ -14,3 +14,10 @@ __pycache__/
 
 # Claude Code
 .claude/
+
+# Tauri / Rust
+ui/src-tauri/target/
+ui/dist/
+
+# Node
+ui/node_modules/

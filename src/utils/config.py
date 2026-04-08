@@ -98,6 +98,13 @@ class LoggingConfig:
 
 
 @dataclass
+class ApiConfig:
+    enabled: bool = True
+    host: str = "127.0.0.1"
+    port: int = 9876
+
+
+@dataclass
 class AppConfig:
     detection: DetectionConfig = field(default_factory=DetectionConfig)
     audio: AudioConfig = field(default_factory=AudioConfig)
@@ -107,6 +114,7 @@ class AppConfig:
     markdown: MarkdownConfig = field(default_factory=MarkdownConfig)
     notion: NotionConfig = field(default_factory=NotionConfig)
     logging: LoggingConfig = field(default_factory=LoggingConfig)
+    api: ApiConfig = field(default_factory=ApiConfig)
 
 
 def _expand_path(path_str: str) -> str:
@@ -156,6 +164,7 @@ def load_config(config_path: Optional[Path] = None) -> AppConfig:
         markdown=_build_dataclass(MarkdownConfig, raw.get("markdown", {})),
         notion=_build_dataclass(NotionConfig, raw.get("notion", {})),
         logging=_build_dataclass(LoggingConfig, raw.get("logging", {})),
+        api=_build_dataclass(ApiConfig, raw.get("api", {})),
     )
 
     # Expand user paths so downstream code doesn't need to worry about tildes.

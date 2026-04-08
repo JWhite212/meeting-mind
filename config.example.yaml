@@ -149,3 +149,10 @@ notion:
 logging:
   level: "INFO"  # DEBUG, INFO, WARNING, ERROR
   log_file: "~/Library/Logs/meetingmind.log"
+
+# --- API Server ---
+# The UI connects to this server for real-time status and meeting history.
+api:
+  enabled: true
+  host: "127.0.0.1"
+  port: 9876

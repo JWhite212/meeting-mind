@@ -1,0 +1,60 @@
+/** API client for communicating with the MeetingMind daemon. */
+
+import type { HealthResponse, MeetingsResponse, Meeting, StatusResponse } from "./types";
+
+const API_BASE = "http://127.0.0.1:9876";
+
+let authToken: string | null = null;
+
+/** Set the auth token (read from ~/.config/meetingmind/auth_token by the Tauri side). */
+export function setAuthToken(token: string) {
+  authToken = token;
+}
+
+async function request<T>(path: string, options?: RequestInit): Promise<T> {
+  const headers: Record<string, string> = {
+    "Content-Type": "application/json",
+    ...(options?.headers as Record<string, string>),
+  };
+
+  if (authToken) {
+    headers["Authorization"] = `Bearer ${authToken}`;
+  }
+
+  const res = await fetch(`${API_BASE}${path}`, {
+    ...options,
+    headers,
+  });
+
+  if (!res.ok) {
+    throw new Error(`API ${res.status}: ${res.statusText}`);
+  }
+
+  return res.json() as Promise<T>;
+}
+
+export async function getHealth(): Promise<HealthResponse> {
+  return request<HealthResponse>("/api/health");
+}
+
+export async function getStatus(): Promise<StatusResponse> {
+  return request<StatusResponse>("/api/status");
+}
+
+export async function getMeetings(
+  limit = 50,
+  offset = 0,
+  query?: string,
+): Promise<MeetingsResponse> {
+  const params = new URLSearchParams({ limit: String(limit), offset: String(offset) });
+  if (query) params.set("q", query);
+  return request<MeetingsResponse>(`/api/meetings?${params}`);
+}
+
+export async function getMeeting(id: string): Promise<Meeting> {
+  return request<Meeting>(`/api/meetings/${id}`);
+}
+
+export async function deleteMeeting(id: string): Promise<void> {
+  await request(`/api/meetings/${id}`, { method: "DELETE" });
+}

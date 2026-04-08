@@ -11,8 +11,9 @@ in ~/.cache/huggingface/hub/ by default.
 """
 
 import logging
-from dataclasses import dataclass, field
+from dataclasses import asdict, dataclass, field
 from pathlib import Path
+from typing import Callable
 
 from faster_whisper import WhisperModel
 
@@ -69,6 +70,15 @@ class Transcript:
     def word_count(self) -> int:
         return len(self.full_text.split())
 
+    def to_dict(self) -> dict:
+        """Serialise to a JSON-compatible dict for database storage."""
+        return {
+            "segments": [asdict(s) for s in self.segments],
+            "language": self.language,
+            "language_probability": self.language_probability,
+            "duration_seconds": self.duration_seconds,
+        }
+
 
 class Transcriber:
     """
@@ -110,9 +120,16 @@ class Transcriber:
         logger.info("Model loaded successfully.")
         return self._model
 
-    def transcribe(self, audio_path: Path) -> Transcript:
+    def transcribe(
+        self,
+        audio_path: Path,
+        on_segment: Callable[[TranscriptSegment], None] | None = None,
+    ) -> Transcript:
         """
         Transcribe a WAV file and return a structured Transcript.
+
+        If *on_segment* is provided, it is called with each segment as it
+        is produced, enabling real-time streaming to the UI.
 
         The audio file should be 16kHz mono PCM (the format produced
         by AudioCapture). faster-whisper handles resampling internally
@@ -140,13 +157,17 @@ class Transcriber:
         # Materialise the generator into a list of TranscriptSegments.
         segments = []
         for seg in segments_iter:
-            segments.append(
-                TranscriptSegment(
-                    start=seg.start,
-                    end=seg.end,
-                    text=seg.text,
-                )
+            ts = TranscriptSegment(
+                start=seg.start,
+                end=seg.end,
+                text=seg.text,
             )
+            segments.append(ts)
+            if on_segment:
+                try:
+                    on_segment(ts)
+                except Exception:
+                    pass
 
         elapsed = __import__("time").time() - start_time
         transcript = Transcript(
