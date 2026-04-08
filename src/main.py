@@ -64,6 +64,8 @@ class MeetingMind:
             else None
         )
 
+        self._meeting_started_at: float = 0.0
+
         # Wire up detector callbacks.
         self._detector.on_meeting_start = self._on_meeting_start
         self._detector.on_meeting_end = self._on_meeting_end
@@ -91,6 +93,7 @@ class MeetingMind:
 
     def _on_meeting_start(self, event: MeetingEvent) -> None:
         """Called by the detector when a Teams meeting begins."""
+        self._meeting_started_at = event.started_at or time.time()
         logger.info("Starting audio capture...")
         try:
             self._capture.start()
@@ -193,7 +196,12 @@ class MeetingMind:
             self._detector.stop()
             if self._capture.is_recording:
                 logger.info("Stopping active recording...")
-                self._capture.stop()
+                audio_path = self._capture.stop()
+                if audio_path and audio_path.exists():
+                    duration = time.time() - self._meeting_started_at
+                    self._process_audio(
+                        audio_path, self._meeting_started_at, duration
+                    )
             sys.exit(0)
 
         signal.signal(signal.SIGINT, shutdown_handler)
