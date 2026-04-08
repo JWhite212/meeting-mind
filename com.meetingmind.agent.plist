@@ -21,13 +21,13 @@
     <key>ProgramArguments</key>
     <array>
         <!-- Update these paths to match your installation. -->
-        <string>/Users/jamiewhite/Documents/Personal/Coding Projects/meeting-mind/.venv/bin/python</string>
+        <string>/Users/jamiewhite/Documents/Documents/Personal/Coding Projects/meeting-mind/.venv/bin/python</string>
         <string>-m</string>
         <string>src.main</string>
     </array>
 
     <key>WorkingDirectory</key>
-    <string>/Users/jamiewhite/Documents/Personal/Coding Projects/meeting-mind</string>
+    <string>/Users/jamiewhite/Documents/Documents/Personal/Coding Projects/meeting-mind</string>
 
     <!-- Start automatically on login. -->
     <key>RunAtLoad</key>
