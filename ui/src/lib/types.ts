@@ -139,6 +139,31 @@ export interface AppConfig {
   api: ApiConfig;
 }
 
+/** Recording control responses. */
+
+export interface RecordingStartResponse {
+  status: "recording";
+  started_at: number;
+}
+
+export interface RecordingStopResponse {
+  status: "stopping";
+}
+
+/** Audio device info from the daemon. */
+
+export interface AudioDevice {
+  index: number;
+  name: string;
+  channels: number;
+  sample_rate: number;
+  is_default: boolean;
+}
+
+export interface DevicesResponse {
+  devices: AudioDevice[];
+}
+
 /** WebSocket event types pushed from the daemon. */
 export type WSEvent =
   | { type: "meeting.detecting"; consecutive: number; required: number }

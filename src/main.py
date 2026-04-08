@@ -335,6 +335,26 @@ class MeetingMind:
             pass
 
     # ------------------------------------------------------------------
+    # Manual recording (called from API)
+    # ------------------------------------------------------------------
+
+    def api_start_recording(self) -> None:
+        """Start a manual recording session via the API."""
+        self._meeting_started_at = time.time()
+        self._emit("meeting.started", started_at=self._meeting_started_at)
+        self._capture.start()
+
+    def api_stop_recording(self) -> None:
+        """Stop a manual recording and trigger processing. Runs synchronously."""
+        started_at = self._meeting_started_at
+        self._emit("meeting.ended", duration=time.time() - started_at)
+        audio_path = self._capture.stop()
+
+        if audio_path and audio_path.exists():
+            duration = time.time() - started_at
+            self._process_audio(audio_path, started_at, duration)
+
+    # ------------------------------------------------------------------
     # Run modes
     # ------------------------------------------------------------------
 
@@ -355,6 +375,11 @@ class MeetingMind:
         self._api_server.set_state_accessors(
             self._get_daemon_state,
             self._get_active_meeting,
+        )
+        self._api_server.set_recording_controls(
+            start=self.api_start_recording,
+            stop=self.api_stop_recording,
+            is_recording=lambda: self._capture.is_recording,
         )
         self._api_server.start()
 

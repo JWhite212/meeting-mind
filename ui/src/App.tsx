@@ -8,6 +8,7 @@ import { Dashboard } from "./components/dashboard/Dashboard";
 import { MeetingList } from "./components/meetings/MeetingList";
 import { MeetingDetail } from "./components/meetings/MeetingDetail";
 import { Settings } from "./components/settings/Settings";
+import { LiveView } from "./components/live/LiveView";
 import { useDaemonStatus } from "./hooks/useDaemonStatus";
 import { useWebSocket } from "./hooks/useWebSocket";
 import { useAppStore } from "./stores/appStore";
@@ -58,6 +59,7 @@ function AppShell() {
         <div data-tauri-drag-region className="h-[52px] shrink-0" />
         <Routes>
           <Route path="/" element={<Dashboard />} />
+          <Route path="/live" element={<LiveView />} />
           <Route path="/meetings" element={<MeetingList />} />
           <Route path="/meetings/:id" element={<MeetingDetail />} />
           <Route path="/settings" element={<Settings />} />

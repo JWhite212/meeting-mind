@@ -16,7 +16,9 @@ from fastapi.middleware.cors import CORSMiddleware
 from src.api.auth import verify_token
 from src.api.events import EventBus
 from src.api.routes import config as config_routes
+from src.api.routes import devices as devices_routes
 from src.api.routes import meetings as meetings_routes
+from src.api.routes import recording as recording_routes
 from src.api.routes import status as status_routes
 from src.utils.config import DEFAULT_CONFIG_PATH
 from src.api.websocket import ConnectionManager
@@ -51,9 +53,19 @@ class ApiServer:
         self._get_daemon_state = lambda: "idle"
         self._get_active_meeting = lambda: None
 
+        # Recording controls (set by MeetingMind before start).
+        self._start_recording = None
+        self._stop_recording = None
+        self._is_recording = None
+
     def set_state_accessors(self, get_daemon_state, get_active_meeting) -> None:
         self._get_daemon_state = get_daemon_state
         self._get_active_meeting = get_active_meeting
+
+    def set_recording_controls(self, start, stop, is_recording) -> None:
+        self._start_recording = start
+        self._stop_recording = stop
+        self._is_recording = is_recording
 
     def _create_app(self) -> FastAPI:
         app = FastAPI(
@@ -82,12 +94,17 @@ class ApiServer:
         status_routes.init(self._get_daemon_state, self._get_active_meeting)
         meetings_routes.init(self.repo)
         config_routes.init(DEFAULT_CONFIG_PATH)
+        recording_routes.init(
+            self._start_recording, self._stop_recording, self._is_recording
+        )
 
         # Register REST routers with auth dependency.
         auth_deps = [Depends(verify_token)]
         app.include_router(status_routes.router, dependencies=auth_deps)
         app.include_router(meetings_routes.router, dependencies=auth_deps)
         app.include_router(config_routes.router, dependencies=auth_deps)
+        app.include_router(recording_routes.router, dependencies=auth_deps)
+        app.include_router(devices_routes.router, dependencies=auth_deps)
 
         # WebSocket endpoint (no auth — the UI running on localhost is trusted).
         @app.websocket("/ws")

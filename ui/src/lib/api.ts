@@ -1,6 +1,15 @@
 /** API client for communicating with the MeetingMind daemon. */
 
-import type { AppConfig, HealthResponse, MeetingsResponse, Meeting, StatusResponse } from "./types";
+import type {
+  AppConfig,
+  DevicesResponse,
+  HealthResponse,
+  MeetingsResponse,
+  Meeting,
+  RecordingStartResponse,
+  RecordingStopResponse,
+  StatusResponse,
+} from "./types";
 
 const API_BASE = "http://127.0.0.1:9876";
 
@@ -68,4 +77,16 @@ export async function updateConfig(config: Partial<AppConfig>): Promise<AppConfi
     method: "PUT",
     body: JSON.stringify(config),
   });
+}
+
+export async function startRecording(): Promise<RecordingStartResponse> {
+  return request<RecordingStartResponse>("/api/record/start", { method: "POST" });
+}
+
+export async function stopRecording(): Promise<RecordingStopResponse> {
+  return request<RecordingStopResponse>("/api/record/stop", { method: "POST" });
+}
+
+export async function getDevices(): Promise<DevicesResponse> {
+  return request<DevicesResponse>("/api/devices");
 }
