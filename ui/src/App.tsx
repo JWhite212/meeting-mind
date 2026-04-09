@@ -1,6 +1,6 @@
 import { BrowserRouter, Routes, Route } from "react-router-dom";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
-import { useCallback, useEffect } from "react";
+import { useCallback, useEffect, useState } from "react";
 import { invoke } from "@tauri-apps/api/core";
 
 import { Sidebar } from "./components/layout/Sidebar";
@@ -13,6 +13,7 @@ import { CommandPalette } from "./components/common/CommandPalette";
 import { useDaemonStatus } from "./hooks/useDaemonStatus";
 import { useWebSocket } from "./hooks/useWebSocket";
 import { useTraySync } from "./hooks/useTraySync";
+import { useNotifications } from "./hooks/useNotifications";
 import { useAppStore } from "./stores/appStore";
 import { setAuthToken } from "./lib/api";
 import type { WSEvent } from "./lib/types";
@@ -29,7 +30,9 @@ const queryClient = new QueryClient({
 function AppShell() {
   const { daemonRunning, state } = useDaemonStatus();
   const handleEvent = useAppStore((s) => s.handleEvent);
+  const [lastEvent, setLastEvent] = useState<WSEvent | null>(null);
   useTraySync(state);
+  useNotifications(lastEvent);
 
   // Load auth token from disk via Tauri on mount.
   useEffect(() => {
@@ -43,6 +46,7 @@ function AppShell() {
   const onWSEvent = useCallback(
     (event: WSEvent) => {
       handleEvent(event);
+      setLastEvent(event);
 
       // Invalidate meeting queries on pipeline completion.
       if (event.type === "pipeline.complete") {

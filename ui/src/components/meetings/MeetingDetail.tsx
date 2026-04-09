@@ -2,7 +2,7 @@ import { useParams, useNavigate } from "react-router-dom";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { useState } from "react";
 import Markdown from "react-markdown";
-import { getMeeting, deleteMeeting } from "../../lib/api";
+import { getMeeting, deleteMeeting, exportMeeting } from "../../lib/api";
 import { API_BASE } from "../../lib/constants";
 import type { TranscriptSegment } from "../../lib/types";
 import { AudioPlayer } from "./AudioPlayer";
@@ -59,6 +59,7 @@ export function MeetingDetail() {
   const queryClient = useQueryClient();
   const [activeTab, setActiveTab] = useState<"summary" | "transcript">("summary");
   const [confirmDelete, setConfirmDelete] = useState(false);
+  const [exportOpen, setExportOpen] = useState(false);
 
   const { data: meeting, isLoading } = useQuery({
     queryKey: ["meeting", id],
@@ -166,6 +167,65 @@ export function MeetingDetail() {
                 {tag}
               </span>
             ))}
+          </div>
+        )}
+      </div>
+
+      {/* Export */}
+      <div className="relative inline-block">
+        <button
+          onClick={() => setExportOpen(!exportOpen)}
+          className="px-3 py-1.5 text-xs rounded-lg bg-surface-raised border border-border text-text-secondary hover:bg-sidebar-hover transition-colors flex items-center gap-1.5"
+        >
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+            <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4" /><polyline points="7 10 12 15 17 10" /><line x1="12" y1="15" x2="12" y2="3" />
+          </svg>
+          Export
+        </button>
+        {exportOpen && (
+          <div className="absolute left-0 mt-1 w-40 rounded-lg bg-surface-raised border border-border shadow-lg z-10 py-1">
+            <button
+              onClick={async () => {
+                setExportOpen(false);
+                const md = await exportMeeting(id!, "markdown");
+                const blob = new Blob([md], { type: "text/markdown" });
+                const url = URL.createObjectURL(blob);
+                const a = document.createElement("a");
+                a.href = url;
+                a.download = `${meeting.title || "meeting"}.md`;
+                a.click();
+                URL.revokeObjectURL(url);
+              }}
+              className="w-full text-left px-3 py-1.5 text-xs text-text-secondary hover:bg-sidebar-hover transition-colors"
+            >
+              Markdown (.md)
+            </button>
+            <button
+              onClick={async () => {
+                setExportOpen(false);
+                const json = await exportMeeting(id!, "json");
+                const blob = new Blob([json], { type: "application/json" });
+                const url = URL.createObjectURL(blob);
+                const a = document.createElement("a");
+                a.href = url;
+                a.download = `${meeting.title || "meeting"}.json`;
+                a.click();
+                URL.revokeObjectURL(url);
+              }}
+              className="w-full text-left px-3 py-1.5 text-xs text-text-secondary hover:bg-sidebar-hover transition-colors"
+            >
+              JSON (.json)
+            </button>
+            <button
+              onClick={async () => {
+                setExportOpen(false);
+                const md = meeting.summary_markdown || "";
+                await navigator.clipboard.writeText(md);
+              }}
+              className="w-full text-left px-3 py-1.5 text-xs text-text-secondary hover:bg-sidebar-hover transition-colors"
+            >
+              Copy summary
+            </button>
           </div>
         )}
       </div>

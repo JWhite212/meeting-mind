@@ -171,8 +171,8 @@ export type WSEvent =
   | { type: "meeting.ended"; duration: number }
   | { type: "pipeline.stage"; meeting_id: string | null; stage: string }
   | { type: "pipeline.progress"; meeting_id: string | null; stage: string; percent: number }
-  | { type: "pipeline.complete"; meeting_id: string | null }
+  | { type: "pipeline.complete"; meeting_id: string | null; title?: string }
   | { type: "pipeline.error"; meeting_id: string | null; stage: string; error: string }
   | { type: "transcript.segment"; meeting_id: string | null; segment: TranscriptSegment }
-  | { type: "audio.level"; rms_system: number; rms_mic: number }
+  | { type: "audio.level"; system_rms: number; mic_rms: number }
   | { type: "daemon.status"; state: DaemonState };

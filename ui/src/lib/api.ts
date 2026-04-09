@@ -90,3 +90,19 @@ export async function stopRecording(): Promise<RecordingStopResponse> {
 export async function getDevices(): Promise<DevicesResponse> {
   return request<DevicesResponse>("/api/devices");
 }
+
+export async function exportMeeting(
+  id: string,
+  format: "markdown" | "json" = "markdown",
+): Promise<string> {
+  const headers: Record<string, string> = {};
+  if (authToken) {
+    headers["Authorization"] = `Bearer ${authToken}`;
+  }
+  const res = await fetch(
+    `${API_BASE}/api/export/${id}?format=${format}`,
+    { method: "POST", headers },
+  );
+  if (!res.ok) throw new Error(`Export failed: ${res.status}`);
+  return res.text();
+}

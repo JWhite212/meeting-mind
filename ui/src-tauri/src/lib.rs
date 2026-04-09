@@ -20,6 +20,7 @@ fn read_auth_token() -> Result<String, String> {
 pub fn run() {
     tauri::Builder::default()
         .plugin(tauri_plugin_opener::init())
+        .plugin(tauri_plugin_notification::init())
         .invoke_handler(tauri::generate_handler![
             read_auth_token,
             tray::update_tray_state,

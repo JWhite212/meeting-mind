@@ -143,6 +143,16 @@ class MeetingMind:
 
         self._emit("meeting.started", started_at=self._meeting_started_at)
 
+        # Wire audio level callback for live metering.
+        def _on_level(system_rms: float, mic_rms: float) -> None:
+            self._emit(
+                "audio.level",
+                system_rms=round(system_rms, 6),
+                mic_rms=round(mic_rms, 6),
+            )
+
+        self._capture.on_audio_level = _on_level
+
         try:
             self._capture.start()
         except Exception as e:
@@ -314,7 +324,7 @@ class MeetingMind:
             except Exception as e:
                 logger.error(f"Notion write failed: {e}", exc_info=True)
 
-        self._emit("pipeline.complete", meeting_id=meeting_id)
+        self._emit("pipeline.complete", meeting_id=meeting_id, title=summary.title)
         self._active_meeting_id = None
         logger.info("Processing complete.")
 

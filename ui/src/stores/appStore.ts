@@ -1,6 +1,11 @@
 import { create } from "zustand";
 import type { WSEvent, TranscriptSegment } from "../lib/types";
 
+interface AudioLevels {
+  system: number;
+  mic: number;
+}
+
 interface AppState {
   /** WebSocket connection status. */
   wsConnected: boolean;
@@ -11,6 +16,9 @@ interface AppState {
 
   /** Live transcript segments for the active meeting. */
   liveSegments: TranscriptSegment[];
+
+  /** Live audio levels (RMS, 0.0–1.0). */
+  audioLevels: AudioLevels;
 
   /** Handle a WebSocket event. */
   handleEvent: (event: WSEvent) => void;
@@ -25,6 +33,7 @@ export const useAppStore = create<AppState>((set) => ({
 
   pipelineStage: null,
   liveSegments: [],
+  audioLevels: { system: 0, mic: 0 },
 
   handleEvent: (event) => {
     switch (event.type) {
@@ -32,18 +41,21 @@ export const useAppStore = create<AppState>((set) => ({
         set({ pipelineStage: event.stage });
         break;
       case "pipeline.complete":
-        set({ pipelineStage: null, liveSegments: [] });
+        set({ pipelineStage: null, liveSegments: [], audioLevels: { system: 0, mic: 0 } });
         break;
       case "pipeline.error":
-        set({ pipelineStage: null });
+        set({ pipelineStage: null, audioLevels: { system: 0, mic: 0 } });
         break;
       case "transcript.segment":
         set((state) => ({
           liveSegments: [...state.liveSegments, event.segment],
         }));
         break;
+      case "audio.level":
+        set({ audioLevels: { system: event.system_rms ?? 0, mic: event.mic_rms ?? 0 } });
+        break;
     }
   },
 
-  resetLive: () => set({ pipelineStage: null, liveSegments: [] }),
+  resetLive: () => set({ pipelineStage: null, liveSegments: [], audioLevels: { system: 0, mic: 0 } }),
 }));

@@ -59,6 +59,7 @@ export function LiveView() {
   const { daemonRunning, state, activeMeeting } = useDaemonStatus();
   const pipelineStage = useAppStore((s) => s.pipelineStage);
   const liveSegments = useAppStore((s) => s.liveSegments);
+  const audioLevels = useAppStore((s) => s.audioLevels);
   const queryClient = useQueryClient();
   const segmentsEndRef = useRef<HTMLDivElement>(null);
 
@@ -152,6 +153,19 @@ export function LiveView() {
           </p>
         )}
       </div>
+
+      {/* Audio level meters */}
+      {isRecording && (
+        <div className="rounded-xl bg-surface-raised border border-border p-5">
+          <h2 className="text-sm font-medium text-text-primary mb-3">
+            Audio Levels
+          </h2>
+          <div className="flex flex-col gap-3">
+            <LevelMeter label="System" value={audioLevels.system} color="bg-status-idle" />
+            <LevelMeter label="Mic" value={audioLevels.mic} color="bg-accent" />
+          </div>
+        </div>
+      )}
 
       {/* Pipeline progress */}
       {(isRecording || isProcessing) && (
@@ -250,6 +264,35 @@ export function LiveView() {
           </p>
         </div>
       )}
+    </div>
+  );
+}
+
+function LevelMeter({
+  label,
+  value,
+  color,
+}: {
+  label: string;
+  value: number;
+  color: string;
+}) {
+  // RMS values are typically 0–0.3 for speech; scale to fill the bar.
+  const pct = Math.min(100, Math.round(value * 400));
+  return (
+    <div className="flex items-center gap-3">
+      <span className="text-xs text-text-muted w-12 text-right shrink-0">
+        {label}
+      </span>
+      <div className="flex-1 h-2 rounded-full bg-border overflow-hidden">
+        <div
+          className={`h-full rounded-full transition-[width] duration-100 ${color}`}
+          style={{ width: `${pct}%` }}
+        />
+      </div>
+      <span className="text-[10px] text-text-muted w-8 font-mono tabular-nums">
+        {pct > 0 ? `${Math.round(20 * Math.log10(value + 1e-10))}` : "—"}
+      </span>
     </div>
   );
 }

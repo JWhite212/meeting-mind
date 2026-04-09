@@ -17,6 +17,7 @@ from src.api.auth import verify_token
 from src.api.events import EventBus
 from src.api.routes import config as config_routes
 from src.api.routes import devices as devices_routes
+from src.api.routes import export as export_routes
 from src.api.routes import meetings as meetings_routes
 from src.api.routes import recording as recording_routes
 from src.api.routes import status as status_routes
@@ -98,6 +99,8 @@ class ApiServer:
             self._start_recording, self._stop_recording, self._is_recording
         )
 
+        export_routes.init(self.repo)
+
         # Register REST routers with auth dependency.
         auth_deps = [Depends(verify_token)]
         app.include_router(status_routes.router, dependencies=auth_deps)
@@ -105,6 +108,7 @@ class ApiServer:
         app.include_router(config_routes.router, dependencies=auth_deps)
         app.include_router(recording_routes.router, dependencies=auth_deps)
         app.include_router(devices_routes.router, dependencies=auth_deps)
+        app.include_router(export_routes.router, dependencies=auth_deps)
 
         # WebSocket endpoint (no auth — the UI running on localhost is trusted).
         @app.websocket("/ws")
@@ -132,6 +136,7 @@ class ApiServer:
 
         # Re-init routes now that repo is ready.
         meetings_routes.init(self.repo)
+        export_routes.init(self.repo)
 
         self._app = self._create_app()
 

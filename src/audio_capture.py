@@ -24,11 +24,14 @@ import numpy as np
 import sounddevice as sd
 import soundfile as sf
 
+from typing import Callable
+
 from src.utils.config import AudioConfig
 
 logger = logging.getLogger(__name__)
 
 TARGET_RMS_DBFS = -20.0  # Target RMS level for normalisation.
+LEVEL_EMIT_INTERVAL = 0.1  # Seconds between audio level callbacks (~10/sec).
 
 
 class AudioCaptureError(Exception):
@@ -51,6 +54,10 @@ class AudioCapture:
         self._mic_path: Path | None = None
         self._blackhole_idx: int | None = None
         self._mic_idx: int | None = None
+
+        # Audio level callback: called with (system_rms, mic_rms) ~10/sec.
+        self.on_audio_level: Callable[[float, float], None] | None = None
+        self._last_level_time: float = 0.0
 
         # Ensure the temp directory exists.
         os.makedirs(config.temp_audio_dir, exist_ok=True)
@@ -142,6 +149,10 @@ class AudioCapture:
                     subtype="PCM_16",
                 )
 
+            # Track latest RMS for level metering.
+            latest_system_rms = [0.0]
+            latest_mic_rms = [0.0]
+
             # Callbacks write directly to their respective files.
             def system_callback(indata, frames, time_info, status):
                 if status:
@@ -149,6 +160,7 @@ class AudioCapture:
                 if self._recording:
                     mono = self._to_mono(indata)
                     system_file.write(mono)
+                    latest_system_rms[0] = float(np.sqrt(np.mean(mono ** 2)))
 
             def mic_callback(indata, frames, time_info, status):
                 if status:
@@ -156,6 +168,7 @@ class AudioCapture:
                 if self._recording:
                     mono = self._to_mono(indata)
                     mic_file.write(mono)
+                    latest_mic_rms[0] = float(np.sqrt(np.mean(mono ** 2)))
 
             # Determine mic channel count.
             mic_channels = 1
@@ -190,9 +203,21 @@ class AudioCapture:
 
             logger.info("Audio stream(s) opened. Capturing...")
 
-            # Wait until recording is stopped.
+            # Wait until recording is stopped, emitting levels ~10/sec.
             while self._recording:
-                time.sleep(0.1)
+                now = time.monotonic()
+                if (
+                    self.on_audio_level
+                    and now - self._last_level_time >= LEVEL_EMIT_INTERVAL
+                ):
+                    self._last_level_time = now
+                    try:
+                        self.on_audio_level(
+                            latest_system_rms[0], latest_mic_rms[0]
+                        )
+                    except Exception:
+                        pass
+                time.sleep(0.05)
 
             # Stop streams (blocks until callbacks finish).
             system_stream.stop()
