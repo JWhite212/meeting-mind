@@ -221,7 +221,8 @@ class MeetingRepository:
         if audio_retention_days > 0:
             cutoff = now - (audio_retention_days * 86400)
             cursor = await self._db.conn.execute(
-                "SELECT id, audio_path FROM meetings WHERE audio_path IS NOT NULL AND started_at < ?",
+                "SELECT id, audio_path FROM meetings "
+                "WHERE audio_path IS NOT NULL AND started_at < ?",
                 (cutoff,),
             )
             rows = await cursor.fetchall()
