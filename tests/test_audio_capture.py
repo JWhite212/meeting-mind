@@ -202,3 +202,83 @@ class TestAudioCaptureMerge:
         output_audio, _ = sf.read(str(capture._output_path), dtype="float32")
         # The output should not be silent (system at gain 2.0) and should be clipped to [-1, 1].
         assert np.max(np.abs(output_audio)) <= 1.0
+
+
+# ---------------------------------------------------------------------------
+# Edge case tests
+# ---------------------------------------------------------------------------
+
+
+class TestAudioCaptureEdgeCases:
+    """Edge-case tests for AudioCapture."""
+
+    def test_is_recording_false_initially(self, audio_config):
+        capture = AudioCapture(audio_config)
+        assert capture.is_recording is False
+
+    def test_merge_mismatched_lengths(self, tmp_path):
+        """_merge_sources() pads the shorter source to match the longer one."""
+        config = AudioConfig(
+            temp_audio_dir=str(tmp_path),
+            sample_rate=16000,
+            keep_source_files=True,
+        )
+        capture = AudioCapture(config)
+
+        system_path = tmp_path / "system.wav"
+        mic_path = tmp_path / "mic.wav"
+        output_path = tmp_path / "output.wav"
+
+        # System audio: 2 seconds (32000 samples at 16kHz).
+        system_signal = np.full(32000, 0.3, dtype=np.float32)
+        sf.write(str(system_path), system_signal, 16000, subtype="PCM_16")
+
+        # Mic audio: 1 second (16000 samples at 16kHz).
+        mic_signal = np.full(16000, 0.3, dtype=np.float32)
+        sf.write(str(mic_path), mic_signal, 16000, subtype="PCM_16")
+
+        capture._system_path = system_path
+        capture._mic_path = mic_path
+        capture._output_path = output_path
+        capture._config.mic_enabled = True
+        capture._mic_idx = 0
+
+        capture._merge_sources()
+
+        assert output_path.exists()
+        output_audio, sr = sf.read(str(output_path), dtype="float32")
+        # Output should match the longer source (32000 samples).
+        assert len(output_audio) == 32000
+        assert sr == 16000
+
+    def test_merge_single_source_no_mic(self, tmp_path):
+        """_merge_sources() with no mic normalises system audio only."""
+        config = AudioConfig(
+            temp_audio_dir=str(tmp_path),
+            sample_rate=16000,
+            keep_source_files=True,
+        )
+        capture = AudioCapture(config)
+
+        system_path = tmp_path / "system.wav"
+        output_path = tmp_path / "output.wav"
+
+        signal = np.full(16000, 0.5, dtype=np.float32)
+        sf.write(str(system_path), signal, 16000, subtype="PCM_16")
+
+        capture._system_path = system_path
+        capture._mic_path = None
+        capture._output_path = output_path
+
+        capture._merge_sources()
+
+        assert output_path.exists()
+        output_audio, _ = sf.read(str(output_path), dtype="float32")
+        assert len(output_audio) == 16000
+        # Output should be normalised (not silent).
+        assert np.max(np.abs(output_audio)) > 0.0
+
+    def test_rms_dbfs_near_zero_floor(self):
+        """RMS below 1e-10 should be floored to -100.0 dBFS."""
+        audio = np.array([1e-11, -1e-11], dtype=np.float64)
+        assert AudioCapture._rms_dbfs(audio) == -100.0

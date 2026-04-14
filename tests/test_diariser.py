@@ -162,3 +162,68 @@ class TestDiariser:
 
     def test_rms_empty_array_returns_zero(self):
         assert Diariser._rms(np.array([])) == 0.0
+
+    def test_custom_energy_threshold(self, tmp_path):
+        """Very high threshold means neither source dominates -> both label."""
+        system_path = tmp_path / "system.wav"
+        mic_path = tmp_path / "mic.wav"
+        # Mic is moderately louder, but not 100x louder.
+        _make_wav(system_path, _sine_wave(amplitude=0.3))
+        _make_wav(mic_path, _sine_wave(amplitude=0.5))
+
+        diariser = _make_diariser(energy_ratio_threshold=100.0)
+        transcript = _make_transcript([
+            TranscriptSegment(start=0.0, end=0.5, text="Ambiguous"),
+        ])
+
+        result = diariser.diarise(transcript, system_path, mic_path)
+        assert result.segments[0].speaker == "Me + Remote"
+
+    def test_custom_speaker_labels(self, tmp_path):
+        """Custom speaker_name and remote_label appear in output."""
+        system_path = tmp_path / "system.wav"
+        mic_path = tmp_path / "mic.wav"
+        _make_wav(system_path, _silence())
+        _make_wav(mic_path, _sine_wave())
+
+        diariser = _make_diariser(speaker_name="Alice", remote_label="Bob")
+        transcript = _make_transcript([
+            TranscriptSegment(start=0.0, end=0.5, text="Alice speaking"),
+        ])
+
+        result = diariser.diarise(transcript, system_path, mic_path)
+        assert result.segments[0].speaker == "Alice"
+
+    def test_diarise_returns_same_transcript_object(self, tmp_path):
+        """diarise() mutates in-place and returns the same object."""
+        system_path = tmp_path / "system.wav"
+        mic_path = tmp_path / "mic.wav"
+        _make_wav(system_path, _silence())
+        _make_wav(mic_path, _sine_wave())
+
+        diariser = _make_diariser()
+        transcript = _make_transcript([
+            TranscriptSegment(start=0.0, end=0.5, text="Test"),
+        ])
+
+        result = diariser.diarise(transcript, system_path, mic_path)
+        assert result is transcript
+
+    def test_segment_at_exact_file_boundary(self, tmp_path):
+        """Segment ending exactly at file duration should not error."""
+        duration_s = 1.0
+        sr = 16000
+        system_path = tmp_path / "system.wav"
+        mic_path = tmp_path / "mic.wav"
+        _make_wav(system_path, _sine_wave(duration_s=duration_s, sr=sr), sr=sr)
+        _make_wav(mic_path, _sine_wave(duration_s=duration_s, sr=sr), sr=sr)
+
+        diariser = _make_diariser()
+        # Segment end exactly matches file duration.
+        transcript = _make_transcript([
+            TranscriptSegment(start=0.0, end=duration_s, text="Full file"),
+        ])
+
+        result = diariser.diarise(transcript, system_path, mic_path)
+        # Should complete without error and assign a speaker label.
+        assert result.segments[0].speaker != ""
