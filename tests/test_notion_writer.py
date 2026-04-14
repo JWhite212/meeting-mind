@@ -84,6 +84,14 @@ class TestNotionMarkdownConversion:
         assert len(blocks) == 2
         assert all(b["type"] == "paragraph" for b in blocks)
 
+    def test_h4_heading_becomes_paragraph(self):
+        md = "#### H4 Heading"
+        blocks = self._writer()._markdown_to_notion_blocks(md)
+        assert len(blocks) == 1
+        assert blocks[0]["type"] == "paragraph"
+        text = blocks[0]["paragraph"]["rich_text"][0]["text"]["content"]
+        assert text == "#### H4 Heading"
+
 
 # ---------------------------------------------------------------------------
 # Rich text splitting tests
@@ -106,6 +114,16 @@ class TestNotionRichText:
         assert len(result[0]["text"]["content"]) == 2000
         assert len(result[1]["text"]["content"]) == 2000
         assert len(result[2]["text"]["content"]) == 500
+
+    def test_rich_text_empty_string(self):
+        result = NotionWriter._rich_text("")
+        assert len(result) == 1
+        assert result[0] == {"type": "text", "text": {"content": ""}}
+
+    def test_rich_text_exact_boundary(self):
+        result = NotionWriter._rich_text("a" * 2000)
+        assert len(result) == 1
+        assert result[0]["text"]["content"] == "a" * 2000
 
 
 # ---------------------------------------------------------------------------
@@ -209,3 +227,30 @@ class TestNotionWriter:
         # Verify the append was called with the correct page ID.
         append_call = mock_client.blocks.children.append.call_args
         assert append_call.kwargs["block_id"] == "big-page-id"
+
+    @patch("src.output.notion_writer.NotionClient")
+    def test_write_no_tags(
+        self, mock_client_cls, transcript, started_at, duration
+    ):
+        summary = MeetingSummary(
+            raw_markdown="## Summary\nNo tags here.",
+            title="Tagless Meeting",
+            tags=[],
+        )
+
+        mock_client = MagicMock()
+        mock_client.pages.create.return_value = {
+            "url": "https://notion.so/no-tags",
+            "id": "no-tags-id",
+        }
+        mock_client_cls.return_value = mock_client
+
+        writer = _make_writer(api_key="test-key", database_id="test-db")
+        url = writer.write(summary, transcript, started_at, duration)
+
+        assert url == "https://notion.so/no-tags"
+        call_kwargs = mock_client.pages.create.call_args.kwargs
+        properties = call_kwargs["properties"]
+
+        # Empty tags list should not produce a Tags multi_select property.
+        assert "Tags" not in properties
