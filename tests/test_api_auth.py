@@ -3,6 +3,7 @@
 import os
 import stat
 
+import pytest
 from fastapi import Depends, FastAPI
 from fastapi.testclient import TestClient
 
@@ -29,43 +30,36 @@ def _auth_headers(token: str = TEST_TOKEN):
     return {"Authorization": f"Bearer {token}"}
 
 
+@pytest.fixture(autouse=True)
+def _patch_auth():
+    original = auth_mod._auth_token
+    auth_mod._auth_token = TEST_TOKEN
+    yield
+    auth_mod._auth_token = original
+
+
 # ---- Tests 1-3: Token verification via HTTP ----
 
 
 def test_empty_bearer_token_returns_403():
-    original = auth_mod._auth_token
-    auth_mod._auth_token = TEST_TOKEN
-    try:
-        app = _make_auth_app()
-        with TestClient(app) as c:
-            resp = c.get("/api/status", headers={"Authorization": "Bearer "})
-            assert resp.status_code == 403
-    finally:
-        auth_mod._auth_token = original
+    app = _make_auth_app()
+    with TestClient(app) as c:
+        resp = c.get("/api/status", headers={"Authorization": "Bearer "})
+        assert resp.status_code == 403
 
 
 def test_missing_bearer_prefix_returns_401():
-    original = auth_mod._auth_token
-    auth_mod._auth_token = TEST_TOKEN
-    try:
-        app = _make_auth_app()
-        with TestClient(app) as c:
-            resp = c.get("/api/status", headers={"Authorization": "Token abc"})
-            assert resp.status_code == 401
-    finally:
-        auth_mod._auth_token = original
+    app = _make_auth_app()
+    with TestClient(app) as c:
+        resp = c.get("/api/status", headers={"Authorization": "Token abc"})
+        assert resp.status_code == 401
 
 
 def test_token_in_query_param_not_accepted():
-    original = auth_mod._auth_token
-    auth_mod._auth_token = TEST_TOKEN
-    try:
-        app = _make_auth_app()
-        with TestClient(app) as c:
-            resp = c.get(f"/api/status?token={TEST_TOKEN}")
-            assert resp.status_code == 401
-    finally:
-        auth_mod._auth_token = original
+    app = _make_auth_app()
+    with TestClient(app) as c:
+        resp = c.get(f"/api/status?token={TEST_TOKEN}")
+        assert resp.status_code == 401
 
 
 # ---- Tests 4-6: Token generation / persistence ----
@@ -103,3 +97,30 @@ def test_token_file_permissions(tmp_path, monkeypatch):
     file_stat = os.stat(token_path)
     mode = stat.S_IMODE(file_stat.st_mode)
     assert mode == 0o600, f"Expected 0o600, got {oct(mode)}"
+
+
+# ---- Tests 7-9: Additional auth edge cases ----
+
+
+def test_whitespace_padded_token_accepted():
+    app = _make_auth_app()
+    with TestClient(app) as c:
+        resp = c.get(
+            "/api/status",
+            headers={"Authorization": f"Bearer   {TEST_TOKEN}  "},
+        )
+        assert resp.status_code == 200
+
+
+def test_no_authorization_header_returns_401():
+    app = _make_auth_app()
+    with TestClient(app) as c:
+        resp = c.get("/api/status")
+        assert resp.status_code == 401
+
+
+def test_valid_token_accepted():
+    app = _make_auth_app()
+    with TestClient(app) as c:
+        resp = c.get("/api/status", headers=_auth_headers())
+        assert resp.status_code == 200

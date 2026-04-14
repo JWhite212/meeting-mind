@@ -145,3 +145,42 @@ def test_deep_merge_nested_dicts(tmp_path):
     assert saved["detection"]["poll_interval_seconds"] == 5
     # The sibling field should be preserved.
     assert saved["detection"]["min_meeting_duration_seconds"] == 30
+
+
+def test_empty_secret_not_masked(tmp_path):
+    config_path = tmp_path / "config.yaml"
+    config_path.write_text(yaml.dump({
+        "summarisation": {"anthropic_api_key": ""},
+    }))
+    app = _make_config_app(config_path)
+    with TestClient(app) as c:
+        resp = c.get("/api/config", headers=_auth_headers())
+        assert resp.status_code == 200
+        data = resp.json()
+        assert data["summarisation"]["anthropic_api_key"] == ""
+
+
+def test_put_config_empty_body(tmp_path):
+    config_path = tmp_path / "config.yaml"
+    original_content = yaml.dump({"detection": {"poll_interval_seconds": 3}})
+    config_path.write_text(original_content)
+    app = _make_config_app(config_path)
+    with TestClient(app) as c:
+        resp = c.put("/api/config", headers=_auth_headers(), json={})
+        assert resp.status_code == 200
+
+    saved = yaml.safe_load(config_path.read_text())
+    assert saved["detection"]["poll_interval_seconds"] == 3
+
+
+def test_put_config_no_config_path_returns_500(tmp_path, monkeypatch):
+    app = _make_config_app(tmp_path / "config.yaml")
+    # Override _config_path to None after app creation to simulate uninitialised state.
+    monkeypatch.setattr(config_routes, "_config_path", None)
+    with TestClient(app) as c:
+        resp = c.put(
+            "/api/config",
+            headers=_auth_headers(),
+            json={"detection": {"poll_interval_seconds": 5}},
+        )
+        assert resp.status_code == 500
