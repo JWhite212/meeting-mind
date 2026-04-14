@@ -49,3 +49,32 @@ def test_wrong_type_in_field():
     config = DetectionConfig(poll_interval_seconds="five")
     # The value is stored as-is — no type coercion or validation.
     assert config.poll_interval_seconds == "five"
+
+
+def test_empty_process_names_list(tmp_path):
+    """An empty process_names list is valid — no iteration needed."""
+    config_path = tmp_path / "config.yaml"
+    config_path.write_text(
+        yaml.dump({"detection": {"process_names": []}})
+    )
+    config = load_config(config_path)
+    assert config.detection.process_names == []
+
+
+def test_expand_path_nonexistent_env_var():
+    """os.path.expandvars leaves undefined variables as literal strings."""
+    result = _expand_path("$NONEXISTENT_VAR_12345/foo")
+    assert "$NONEXISTENT_VAR_12345" in result
+
+
+def test_yaml_list_instead_of_dict(tmp_path):
+    """A YAML file containing a list (not a dict) should fail gracefully.
+
+    load_config calls raw.get(...) on the parsed YAML.  When the top-level
+    value is a list, .get() does not exist, so an AttributeError is raised.
+    """
+    config_path = tmp_path / "config.yaml"
+    config_path.write_text("- item1\n- item2\n")
+
+    with pytest.raises(AttributeError):
+        load_config(config_path)

@@ -159,3 +159,44 @@ async def test_cleanup_old_meetings(repo: MeetingRepository, tmp_path):
     # Old meeting gone, recent one still exists
     assert await repo.get_meeting(old_id) is None
     assert await repo.count_meetings() == 1
+
+
+@pytest.mark.asyncio
+async def test_cleanup_audio_only_retention(repo: MeetingRepository, tmp_path):
+    """Audio-only retention nullifies audio_path but keeps the record."""
+    # Create an old meeting (10 days ago) with an audio file.
+    old_time = time.time() - (10 * 86400)
+    old_id = await repo.create_meeting(started_at=old_time)
+    audio_file = tmp_path / "meeting.wav"
+    audio_file.write_bytes(b"\x00" * 100)
+    await repo.update_meeting(old_id, audio_path=str(audio_file))
+
+    result = await repo.cleanup_old_meetings(
+        audio_retention_days=1,
+        record_retention_days=0,  # 0 = keep records forever
+    )
+    assert result["audio_deleted"] == 1
+
+    # Record should still exist but audio_path should be NULL.
+    meeting = await repo.get_meeting(old_id)
+    assert meeting is not None
+    assert meeting.audio_path is None
+
+
+@pytest.mark.asyncio
+async def test_update_meeting_empty_tags_list(repo: MeetingRepository):
+    """Updating tags to an empty list should round-trip via JSON correctly."""
+    mid = await repo.create_meeting(started_at=time.time())
+    await repo.update_meeting(mid, tags=["initial"])
+    await repo.update_meeting(mid, tags=[])
+    meeting = await repo.get_meeting(mid)
+    assert meeting.tags == []
+
+
+@pytest.mark.asyncio
+async def test_search_meetings_empty_query(repo: MeetingRepository):
+    """An empty search query should not crash."""
+    await repo.create_meeting(started_at=time.time())
+    # Should not raise — either returns results or empty list.
+    results = await repo.search_meetings("")
+    assert isinstance(results, list)

@@ -114,3 +114,20 @@ async def test_update_fts_index(repo: MeetingRepository):
     )
     # update_fts should not raise — it handles errors internally.
     await repo.update_fts(mid)
+
+
+@pytest.mark.asyncio
+async def test_meeting_record_from_row_all_nulls(repo: MeetingRepository):
+    """A meeting created with only started_at and status should have all
+    optional fields as None and tags as an empty list."""
+    mid = await repo.create_meeting(started_at=time.time())
+    meeting = await repo.get_meeting(mid)
+    assert meeting is not None
+    assert meeting.ended_at is None
+    assert meeting.duration_seconds is None
+    assert meeting.audio_path is None
+    assert meeting.transcript_json is None
+    assert meeting.summary_markdown is None
+    assert meeting.language is None
+    assert meeting.word_count is None
+    assert meeting.tags == []
