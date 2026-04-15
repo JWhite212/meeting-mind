@@ -80,6 +80,7 @@ class SummarisationConfig:
     max_tokens: int = 8192
     ollama_base_url: str = "http://localhost:11434"
     ollama_model: str = "llama3.1:8b"
+    ollama_timeout: int = 600  # Seconds per Ollama request.
 
     def __repr__(self) -> str:
         key_display = "****" if self.anthropic_api_key else "<not set>"
