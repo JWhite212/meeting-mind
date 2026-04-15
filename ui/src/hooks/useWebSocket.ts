@@ -1,13 +1,16 @@
 import { useEffect, useRef, useCallback, useState } from "react";
 import { WS_URL } from "../lib/constants";
+import { getAuthToken } from "../lib/api";
 import type { WSEvent } from "../lib/types";
 
-const RECONNECT_DELAY = 3000;
+const BASE_DELAY = 3000;
+const MAX_DELAY = 30000;
 
 export function useWebSocket(onEvent: (event: WSEvent) => void) {
   const [connected, setConnected] = useState(false);
   const wsRef = useRef<WebSocket | null>(null);
   const reconnectTimer = useRef<ReturnType<typeof setTimeout>>(undefined);
+  const attemptRef = useRef(0);
   const onEventRef = useRef(onEvent);
   onEventRef.current = onEvent;
 
@@ -15,10 +18,15 @@ export function useWebSocket(onEvent: (event: WSEvent) => void) {
     if (wsRef.current?.readyState === WebSocket.OPEN) return;
 
     try {
-      const ws = new WebSocket(WS_URL);
+      const token = getAuthToken();
+      const url = token
+        ? `${WS_URL}?token=${encodeURIComponent(token)}`
+        : WS_URL;
+      const ws = new WebSocket(url);
 
       ws.onopen = () => {
         setConnected(true);
+        attemptRef.current = 0;
       };
 
       ws.onmessage = (e) => {
@@ -33,7 +41,10 @@ export function useWebSocket(onEvent: (event: WSEvent) => void) {
       ws.onclose = () => {
         setConnected(false);
         wsRef.current = null;
-        reconnectTimer.current = setTimeout(connect, RECONNECT_DELAY);
+        const delay = Math.min(BASE_DELAY * Math.pow(2, attemptRef.current), MAX_DELAY);
+        const jitter = Math.random() * 1000;
+        attemptRef.current++;
+        reconnectTimer.current = setTimeout(connect, delay + jitter);
       };
 
       ws.onerror = () => {
@@ -42,7 +53,10 @@ export function useWebSocket(onEvent: (event: WSEvent) => void) {
 
       wsRef.current = ws;
     } catch {
-      reconnectTimer.current = setTimeout(connect, RECONNECT_DELAY);
+      const delay = Math.min(BASE_DELAY * Math.pow(2, attemptRef.current), MAX_DELAY);
+      const jitter = Math.random() * 1000;
+      attemptRef.current++;
+      reconnectTimer.current = setTimeout(connect, delay + jitter);
     }
   }, []);
 

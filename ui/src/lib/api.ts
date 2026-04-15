@@ -21,6 +21,11 @@ export function setAuthToken(token: string) {
   authToken = token;
 }
 
+/** Return the current auth token (used by WebSocket to authenticate via query param). */
+export function getAuthToken(): string | null {
+  return authToken;
+}
+
 async function request<T>(path: string, options?: RequestInit): Promise<T> {
   const headers: Record<string, string> = {
     "Content-Type": "application/json",

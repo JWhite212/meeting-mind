@@ -6,6 +6,7 @@ providing a REST + WebSocket interface for the UI.
 """
 
 import asyncio
+import hmac
 import logging
 import threading
 
@@ -13,7 +14,7 @@ import uvicorn
 from fastapi import Depends, FastAPI, WebSocket, WebSocketDisconnect
 from fastapi.middleware.cors import CORSMiddleware
 
-from src.api.auth import verify_token
+from src.api.auth import _get_token, verify_token
 from src.api.events import EventBus
 from src.api.routes import config as config_routes
 from src.api.routes import devices as devices_routes
@@ -122,9 +123,13 @@ class ApiServer:
         app.include_router(resummarise_routes.router, dependencies=auth_deps)
         app.include_router(models_routes.router, dependencies=auth_deps)
 
-        # WebSocket endpoint (no auth — the UI running on localhost is trusted).
+        # WebSocket endpoint with token auth via query parameter.
         @app.websocket("/ws")
         async def websocket_endpoint(websocket: WebSocket):
+            token = websocket.query_params.get("token", "")
+            if not hmac.compare_digest(token, _get_token()):
+                await websocket.close(code=4001, reason="Unauthorized")
+                return
             await self.ws_manager.connect(websocket)
             try:
                 while True:

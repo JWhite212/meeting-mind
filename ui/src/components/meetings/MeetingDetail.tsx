@@ -2,6 +2,7 @@ import { useParams, useNavigate } from "react-router-dom";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { useState, useRef, useEffect } from "react";
 import Markdown from "react-markdown";
+import rehypeSanitize, { defaultSchema } from "rehype-sanitize";
 import { getMeeting, deleteMeeting, exportMeeting, resummariseMeeting } from "../../lib/api";
 import { API_BASE } from "../../lib/constants";
 import type { TranscriptSegment } from "../../lib/types";
@@ -425,6 +426,15 @@ export function MeetingDetail() {
             {activeTab === "summary" && hasSummary ? (
               <div className="prose prose-sm prose-invert max-w-none text-text-primary [&_h1]:text-text-primary [&_h2]:text-text-primary [&_h3]:text-text-primary [&_li]:text-text-primary [&_p]:text-text-secondary [&_strong]:text-text-primary">
                 <Markdown
+                  rehypePlugins={[
+                    [rehypeSanitize, {
+                      ...defaultSchema,
+                      attributes: {
+                        ...defaultSchema.attributes,
+                        a: [...(defaultSchema.attributes?.a || []), "className"],
+                      },
+                    }],
+                  ]}
                   components={{
                     a: ({ href, children, ...props }) => {
                       const safeHref =

@@ -12,10 +12,8 @@ struct PendingUpdate(Mutex<Option<tauri_plugin_updater::Update>>);
 /// Read the shared auth token so the frontend can authenticate with the API.
 #[tauri::command]
 fn read_auth_token() -> Result<String, String> {
-    let path: PathBuf = dirs::config_dir()
-        .unwrap_or_else(|| PathBuf::from("~/.config"))
-        .join("meetingmind")
-        .join("auth_token");
+    let home = dirs::home_dir().unwrap_or_else(|| PathBuf::from("/tmp"));
+    let path: PathBuf = home.join(".config").join("meetingmind").join("auth_token");
 
     fs::read_to_string(&path)
         .map(|s| s.trim().to_string())

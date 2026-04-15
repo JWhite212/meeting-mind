@@ -1,6 +1,12 @@
-import { BrowserRouter, Routes, Route } from "react-router-dom";
+import {
+  createBrowserRouter,
+  createRoutesFromElements,
+  RouterProvider,
+  Route,
+  Outlet,
+} from "react-router-dom";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import { invoke } from "@tauri-apps/api/core";
 
 import { ErrorBoundary } from "./components/common/ErrorBoundary";
@@ -41,14 +47,6 @@ function AppShell() {
   useTraySync(state);
   useNotifications(lastEvent);
 
-  // Load auth token from disk via Tauri on mount.
-  useEffect(() => {
-    invoke<string>("read_auth_token")
-      .then(setAuthToken)
-      .catch(() => {
-        // Token not available yet — daemon may not have started.
-      });
-  }, []);
 
   const onWSEvent = useCallback(
     (event: WSEvent) => {
@@ -87,27 +85,47 @@ function AppShell() {
         {/* Titlebar drag region over the content area */}
         <div data-tauri-drag-region className="h-[52px] shrink-0" />
         <ErrorBoundary>
-          <Routes>
-            <Route path="/" element={<Dashboard />} />
-            <Route path="/live" element={<LiveView />} />
-            <Route path="/meetings" element={<MeetingList />} />
-            <Route path="/meetings/:id" element={<MeetingDetail />} />
-            <Route path="/settings" element={<Settings />} />
-          </Routes>
+          <Outlet />
         </ErrorBoundary>
       </main>
     </div>
   );
 }
 
+const router = createBrowserRouter(
+  createRoutesFromElements(
+    <Route element={<AppShell />}>
+      <Route path="/" element={<Dashboard />} />
+      <Route path="/live" element={<LiveView />} />
+      <Route path="/meetings" element={<MeetingList />} />
+      <Route path="/meetings/:id" element={<MeetingDetail />} />
+      <Route path="/settings" element={<Settings />} />
+    </Route>,
+  ),
+);
+
 export default function App() {
+  const [authReady, setAuthReady] = useState(false);
+  const attempted = useRef(false);
+
+  useEffect(() => {
+    if (attempted.current) return;
+    attempted.current = true;
+    invoke<string>("read_auth_token")
+      .then(setAuthToken)
+      .catch(() => {
+        // Token not available yet — daemon may not have started.
+      })
+      .finally(() => setAuthReady(true));
+  }, []);
+
+  if (!authReady) return null;
+
   return (
     <QueryClientProvider client={queryClient}>
-      <BrowserRouter>
-        <ToastProvider>
-          <AppShell />
-        </ToastProvider>
-      </BrowserRouter>
+      <ToastProvider>
+        <RouterProvider router={router} />
+      </ToastProvider>
     </QueryClientProvider>
   );
 }
