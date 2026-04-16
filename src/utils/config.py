@@ -84,6 +84,7 @@ class SummarisationConfig:
     ollama_timeout: int = 600  # Seconds per Ollama request.
     chunk_threshold_words: int = 20000  # Words above which transcripts are chunked.
     ollama_num_ctx: int = 32768  # Context window size for Ollama requests.
+    default_template: str = "standard"  # Template name for summarisation.
 
     def __repr__(self) -> str:
         key_display = "****" if self.anthropic_api_key else "<not set>"
