@@ -191,6 +191,29 @@ export interface DevicesResponse {
   devices: AudioDevice[];
 }
 
+/** Search-related types. */
+
+export interface SearchResult {
+  meeting_id: string;
+  segment_index: number;
+  text: string;
+  speaker: string;
+  start_time: number;
+  score: number;
+  meeting_title: string | null;
+}
+
+export interface SearchResponse {
+  results: SearchResult[];
+  query: string;
+}
+
+export interface ReindexResponse {
+  status: string;
+  meetings_indexed: number;
+  segments_indexed: number;
+}
+
 /** WebSocket event types pushed from the daemon. */
 export type WSEvent =
   | { type: "meeting.detecting"; consecutive: number; required: number }

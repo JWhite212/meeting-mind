@@ -9,6 +9,8 @@ import type {
   ModelsResponse,
   RecordingStartResponse,
   RecordingStopResponse,
+  ReindexResponse,
+  SearchResponse,
   StatusResponse,
 } from "./types";
 
@@ -164,4 +166,20 @@ export async function setMeetingLabel(
 export async function getMeetingLabels(): Promise<string[]> {
   const data = await request<{ labels: string[] }>("/api/meetings/labels");
   return data.labels;
+}
+
+export async function searchTranscripts(
+  query: string,
+  limit = 10,
+): Promise<SearchResponse> {
+  return request<SearchResponse>("/api/search", {
+    method: "POST",
+    body: JSON.stringify({ query, limit }),
+  });
+}
+
+export async function reindexMeetings(): Promise<ReindexResponse> {
+  return request<ReindexResponse>("/api/search/reindex", {
+    method: "POST",
+  });
 }
