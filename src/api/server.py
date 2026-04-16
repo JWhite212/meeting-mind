@@ -22,6 +22,7 @@ from src.api.routes import export as export_routes
 from src.api.routes import meetings as meetings_routes
 from src.api.routes import models as models_routes
 from src.api.routes import recording as recording_routes
+from src.api.routes import reprocess as reprocess_routes
 from src.api.routes import resummarise as resummarise_routes
 from src.api.routes import search as search_routes
 from src.api.routes import speakers as speakers_routes
@@ -112,6 +113,7 @@ class ApiServer:
 
         export_routes.init(self.repo)
         resummarise_routes.init(self.repo)
+        reprocess_routes.init(self.repo)
         models_routes.init(self.event_bus)
 
         # Initialise embedder for semantic search (if available).
@@ -134,6 +136,7 @@ class ApiServer:
         app.include_router(devices_routes.router, dependencies=auth_deps)
         app.include_router(export_routes.router, dependencies=auth_deps)
         app.include_router(resummarise_routes.router, dependencies=auth_deps)
+        app.include_router(reprocess_routes.router, dependencies=auth_deps)
         app.include_router(models_routes.router, dependencies=auth_deps)
         app.include_router(templates_routes.router, dependencies=auth_deps)
         app.include_router(search_routes.router, dependencies=auth_deps)
