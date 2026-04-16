@@ -28,3 +28,6 @@ aiosqlite>=0.21.0
 
 # Semantic search (optional — vector search disabled without it)
 sentence-transformers>=2.2.0
+
+# ML-based speaker diarisation (optional — energy-based diarisation works without it)
+# pyannote.audio>=3.1

@@ -1,10 +1,13 @@
-"""Tests for the EnergyDiariser, factory function, and energy-based speaker labelling."""
+"""Tests for the Diariser and energy-based speaker labelling."""
+
+import sys
+from unittest.mock import MagicMock, patch
 
 import numpy as np
 import pytest
 import soundfile as sf
 
-from src.diariser import DiarisationConfig, EnergyDiariser, create_diariser
+from src.diariser import DiarisationConfig, Diariser, EnergyDiariser, create_diariser
 from src.transcriber import Transcript, TranscriptSegment
 
 # ---------------------------------------------------------------------------
@@ -28,10 +31,10 @@ def _silence(duration_s=1.0, sr=16000):
     return np.zeros(int(sr * duration_s), dtype=np.float32)
 
 
-def _make_diariser(**kwargs) -> EnergyDiariser:
-    """Create an EnergyDiariser with default config, overridable via kwargs."""
+def _make_diariser(**kwargs) -> Diariser:
+    """Create a Diariser with default config, overridable via kwargs."""
     config = DiarisationConfig(enabled=True, **kwargs)
-    return EnergyDiariser(config)
+    return Diariser(config)
 
 
 def _make_transcript(segments: list[TranscriptSegment]) -> Transcript:
@@ -177,7 +180,7 @@ class TestDiariser:
         assert result.segments == []
 
     def test_rms_empty_array_returns_zero(self):
-        assert EnergyDiariser._rms(np.array([])) == 0.0
+        assert Diariser._rms(np.array([])) == 0.0
 
     def test_custom_energy_threshold(self, tmp_path):
         """Very high threshold means neither source dominates -> both label."""
@@ -253,20 +256,34 @@ class TestDiariser:
         assert result.segments[0].speaker != ""
 
 
-class TestCreateDiariser:
-    """Tests for the create_diariser factory function."""
-
-    def test_factory_returns_energy_diariser(self):
+class TestFactory:
+    def test_factory_energy_returns_energy_diariser(self):
+        """Factory with backend='energy' returns an EnergyDiariser."""
         config = DiarisationConfig(enabled=True, backend="energy")
         diariser = create_diariser(config)
         assert isinstance(diariser, EnergyDiariser)
 
+    def test_factory_unknown_backend_raises(self):
+        """Factory with unknown backend raises ValueError."""
+        config = DiarisationConfig(enabled=True, backend="unknown")
+        with pytest.raises(ValueError, match="Unknown diarisation backend"):
+            create_diariser(config)
+
     def test_factory_pyannote_not_installed(self):
+        """Factory raises ValueError when pyannote is not installed."""
         config = DiarisationConfig(enabled=True, backend="pyannote")
         with pytest.raises(ValueError, match="pyannote.audio"):
             create_diariser(config)
 
-    def test_factory_unknown_backend(self):
-        config = DiarisationConfig(enabled=True, backend="unknown")
-        with pytest.raises(ValueError, match="Unknown diarisation backend"):
-            create_diariser(config)
+    def test_factory_pyannote_with_mock(self):
+        """When pyannote is available, factory returns PyAnnoteDiariser."""
+        with patch.dict(
+            sys.modules,
+            {
+                "pyannote": MagicMock(),
+                "pyannote.audio": MagicMock(),
+            },
+        ):
+            config = DiarisationConfig(enabled=True, backend="pyannote")
+            diariser = create_diariser(config)
+            assert type(diariser).__name__ == "PyAnnoteDiariser"
