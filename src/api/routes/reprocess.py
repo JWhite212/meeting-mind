@@ -120,7 +120,7 @@ async def reprocess_meeting(meeting_id: str):
         await _repo.update_meeting(meeting_id, status="error")
         raise HTTPException(
             status_code=500,
-            detail=f"Reprocessing failed: {e}",
+            detail="Reprocessing failed. Check daemon logs for details.",
         )
 
     transcript = result["transcript"]

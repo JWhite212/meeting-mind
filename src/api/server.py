@@ -142,14 +142,43 @@ class ApiServer:
         app.include_router(search_routes.router, dependencies=auth_deps)
         app.include_router(speakers_routes.router, dependencies=auth_deps)
 
-        # WebSocket endpoint with token auth via query parameter.
+        # WebSocket endpoint with message-based auth handshake.
+        # The client connects, then sends {"type":"auth","token":"<value>"}
+        # as its first message. Legacy query-param auth also accepted.
         @app.websocket("/ws")
         async def websocket_endpoint(websocket: WebSocket):
-            token = websocket.query_params.get("token", "")
-            if not hmac.compare_digest(token, _get_token()):
+            await websocket.accept()
+
+            # Check for legacy query-param token first.
+            legacy_token = websocket.query_params.get("token", "")
+            if legacy_token and hmac.compare_digest(legacy_token, _get_token()):
+                authenticated = True
+            else:
+                # Wait for auth message within 5 seconds.
+                authenticated = False
+                try:
+                    import json as _json
+
+                    msg = await asyncio.wait_for(
+                        websocket.receive_text(),
+                        timeout=5.0,
+                    )
+                    data = _json.loads(msg)
+                    if (
+                        isinstance(data, dict)
+                        and data.get("type") == "auth"
+                        and isinstance(data.get("token"), str)
+                        and hmac.compare_digest(data["token"], _get_token())
+                    ):
+                        authenticated = True
+                except (asyncio.TimeoutError, Exception):
+                    pass
+
+            if not authenticated:
                 await websocket.close(code=4001, reason="Unauthorized")
                 return
-            await self.ws_manager.connect(websocket)
+
+            self.ws_manager.add(websocket)
             try:
                 while True:
                     await websocket.receive_text()

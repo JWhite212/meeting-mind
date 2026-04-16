@@ -24,6 +24,11 @@ class ConnectionManager:
         self._connections.append(websocket)
         logger.info("WebSocket client connected (%d total)", len(self._connections))
 
+    def add(self, websocket: WebSocket) -> None:
+        """Register an already-accepted WebSocket connection."""
+        self._connections.append(websocket)
+        logger.info("WebSocket client connected (%d total)", len(self._connections))
+
     def disconnect(self, websocket: WebSocket) -> None:
         self._connections = [ws for ws in self._connections if ws is not websocket]
         logger.info("WebSocket client disconnected (%d remaining)", len(self._connections))

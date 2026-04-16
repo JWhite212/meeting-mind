@@ -19,12 +19,13 @@ export function useWebSocket(onEvent: (event: WSEvent) => void) {
 
     try {
       const token = getAuthToken();
-      const url = token
-        ? `${WS_URL}?token=${encodeURIComponent(token)}`
-        : WS_URL;
-      const ws = new WebSocket(url);
+      const ws = new WebSocket(WS_URL);
 
       ws.onopen = () => {
+        // Send auth token as first message instead of in URL.
+        if (token) {
+          ws.send(JSON.stringify({ type: "auth", token }));
+        }
         setConnected(true);
         attemptRef.current = 0;
       };
@@ -41,7 +42,10 @@ export function useWebSocket(onEvent: (event: WSEvent) => void) {
       ws.onclose = () => {
         setConnected(false);
         wsRef.current = null;
-        const delay = Math.min(BASE_DELAY * Math.pow(2, attemptRef.current), MAX_DELAY);
+        const delay = Math.min(
+          BASE_DELAY * Math.pow(2, attemptRef.current),
+          MAX_DELAY,
+        );
         const jitter = Math.random() * 1000;
         attemptRef.current++;
         reconnectTimer.current = setTimeout(connect, delay + jitter);
@@ -53,7 +57,10 @@ export function useWebSocket(onEvent: (event: WSEvent) => void) {
 
       wsRef.current = ws;
     } catch {
-      const delay = Math.min(BASE_DELAY * Math.pow(2, attemptRef.current), MAX_DELAY);
+      const delay = Math.min(
+        BASE_DELAY * Math.pow(2, attemptRef.current),
+        MAX_DELAY,
+      );
       const jitter = Math.random() * 1000;
       attemptRef.current++;
       reconnectTimer.current = setTimeout(connect, delay + jitter);

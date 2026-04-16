@@ -9,10 +9,13 @@ shares a name with a built-in, the custom one takes precedence.
 """
 
 import logging
+import re
 from dataclasses import dataclass, field
 from pathlib import Path
 
 import yaml
+
+_SAFE_NAME_RE = re.compile(r"^[a-zA-Z0-9_\-]+$")
 
 logger = logging.getLogger(__name__)
 
@@ -441,10 +444,28 @@ class TemplateManager:
             return custom[name]
         return self._builtins.get(name)
 
+    @staticmethod
+    def _validate_name(name: str) -> str:
+        """Sanitize and validate a template name for safe filesystem use."""
+        if not name or not _SAFE_NAME_RE.match(name):
+            raise ValueError(
+                f"Invalid template name {name!r}: only alphanumeric, "
+                f"hyphens, and underscores allowed"
+            )
+        return name
+
+    def _safe_path(self, name: str) -> Path:
+        """Return a validated path within the templates directory."""
+        safe = self._validate_name(name)
+        path = (self._templates_dir / f"{safe}.yaml").resolve()
+        if not path.is_relative_to(self._templates_dir.resolve()):
+            raise ValueError("Template name would escape templates directory")
+        return path
+
     def save_template(self, template: SummaryTemplate) -> None:
         """Save (or update) a custom template as a YAML file."""
         self._ensure_dir()
-        path = self._templates_dir / f"{template.name}.yaml"
+        path = self._safe_path(template.name)
         data = {
             "name": template.name,
             "description": template.description,
@@ -466,7 +487,7 @@ class TemplateManager:
         Returns False if the template is not found on disk or is a
         built-in (built-ins cannot be deleted).
         """
-        path = self._templates_dir / f"{name}.yaml"
+        path = self._safe_path(name)
         if not path.is_file():
             return False
         path.unlink()

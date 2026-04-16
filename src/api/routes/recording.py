@@ -42,7 +42,7 @@ async def start_recording():
         _start_recording()
     except Exception as e:
         logger.error("Failed to start recording: %s", e)
-        raise HTTPException(status_code=500, detail=str(e))
+        raise HTTPException(status_code=500, detail="Failed to start recording. Check daemon logs.")
 
     return {"status": "recording", "started_at": time.time()}
 
