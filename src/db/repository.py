@@ -384,6 +384,77 @@ class MeetingRepository:
             )
         return results
 
+    # ------------------------------------------------------------------
+    # Speaker name mapping
+    # ------------------------------------------------------------------
+
+    async def set_speaker_name(
+        self, meeting_id: str, speaker_id: str, display_name: str, source: str = "manual"
+    ) -> None:
+        """Set or update the display name for a speaker in a meeting.
+
+        Also updates the transcript_json to replace speaker labels.
+        """
+        now = time.time()
+        await self._db.conn.execute(
+            """INSERT INTO speaker_mappings
+               (meeting_id, speaker_id, display_name, source, created_at)
+               VALUES (?, ?, ?, ?, ?)
+               ON CONFLICT(meeting_id, speaker_id) DO UPDATE SET
+                   display_name = excluded.display_name,
+                   source = excluded.source,
+                   created_at = excluded.created_at""",
+            (meeting_id, speaker_id, display_name, source, now),
+        )
+
+        # Update transcript_json to replace speaker labels.
+        meeting = await self.get_meeting(meeting_id)
+        if meeting and meeting.transcript_json:
+            data = json.loads(meeting.transcript_json)
+            for seg in data.get("segments", []):
+                if seg.get("speaker") == speaker_id:
+                    seg["speaker"] = display_name
+            await self.update_meeting(meeting_id, transcript_json=json.dumps(data))
+
+        await self._db.conn.commit()
+
+    async def get_speaker_names(self, meeting_id: str) -> list[dict]:
+        """Get all speaker name mappings for a meeting."""
+        cursor = await self._db.conn.execute(
+            "SELECT speaker_id, display_name, source, created_at "
+            "FROM speaker_mappings WHERE meeting_id = ? ORDER BY created_at",
+            (meeting_id,),
+        )
+        rows = await cursor.fetchall()
+        return [
+            {
+                "speaker_id": row["speaker_id"],
+                "display_name": row["display_name"],
+                "source": row["source"],
+                "created_at": row["created_at"],
+            }
+            for row in rows
+        ]
+
+    async def get_global_speaker_names(self) -> list[dict]:
+        """Get all unique speaker mappings across all meetings (most recent wins)."""
+        cursor = await self._db.conn.execute(
+            """SELECT speaker_id, display_name, source, MAX(created_at) as created_at
+               FROM speaker_mappings
+               GROUP BY speaker_id
+               ORDER BY display_name""",
+        )
+        rows = await cursor.fetchall()
+        return [
+            {
+                "speaker_id": row["speaker_id"],
+                "display_name": row["display_name"],
+                "source": row["source"],
+                "created_at": row["created_at"],
+            }
+            for row in rows
+        ]
+
     async def get_meeting_embeddings(self, meeting_id: str) -> list[dict]:
         """Retrieve embeddings for a specific meeting."""
         cursor = await self._db.conn.execute(

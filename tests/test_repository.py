@@ -287,3 +287,70 @@ async def test_get_all_embeddings(repo: MeetingRepository):
     assert len(result) == 3
     texts = {r["text"] for r in result}
     assert texts == {"Segment A.", "Segment B1.", "Segment B2."}
+
+
+# ------------------------------------------------------------------
+# Speaker name mapping tests
+# ------------------------------------------------------------------
+
+
+@pytest.mark.asyncio
+async def test_set_and_get_speaker_names(repo: MeetingRepository):
+    """Set a speaker name then retrieve it."""
+    mid = await repo.create_meeting(started_at=time.time())
+    await repo.set_speaker_name(mid, "SPEAKER_00", "Alice")
+
+    names = await repo.get_speaker_names(mid)
+    assert len(names) == 1
+    assert names[0]["speaker_id"] == "SPEAKER_00"
+    assert names[0]["display_name"] == "Alice"
+    assert names[0]["source"] == "manual"
+    assert isinstance(names[0]["created_at"], float)
+
+
+@pytest.mark.asyncio
+async def test_set_speaker_name_upsert(repo: MeetingRepository):
+    """Setting the same speaker_id twice updates the display_name."""
+    mid = await repo.create_meeting(started_at=time.time())
+    await repo.set_speaker_name(mid, "SPEAKER_00", "Alice")
+    await repo.set_speaker_name(mid, "SPEAKER_00", "Alicia")
+
+    names = await repo.get_speaker_names(mid)
+    assert len(names) == 1
+    assert names[0]["display_name"] == "Alicia"
+
+
+@pytest.mark.asyncio
+async def test_get_global_speaker_names(repo: MeetingRepository):
+    """Global speaker names returns unique speakers across meetings."""
+    mid1 = await repo.create_meeting(started_at=time.time())
+    mid2 = await repo.create_meeting(started_at=time.time())
+    await repo.set_speaker_name(mid1, "SPEAKER_00", "Alice")
+    await repo.set_speaker_name(mid2, "SPEAKER_01", "Bob")
+
+    global_names = await repo.get_global_speaker_names()
+    assert len(global_names) == 2
+    display_names = {n["display_name"] for n in global_names}
+    assert display_names == {"Alice", "Bob"}
+
+
+@pytest.mark.asyncio
+async def test_speaker_name_updates_transcript(repo: MeetingRepository):
+    """Setting a speaker name updates speaker labels in transcript_json."""
+    import json
+
+    mid = await repo.create_meeting(started_at=time.time())
+    transcript_data = {
+        "segments": [
+            {"start": 0, "end": 5, "text": "Hello.", "speaker": "SPEAKER_00"},
+            {"start": 5, "end": 10, "text": "Hi there.", "speaker": "SPEAKER_01"},
+        ],
+    }
+    await repo.update_meeting(mid, transcript_json=json.dumps(transcript_data))
+
+    await repo.set_speaker_name(mid, "SPEAKER_00", "Alice")
+
+    meeting = await repo.get_meeting(mid)
+    updated = json.loads(meeting.transcript_json)
+    assert updated["segments"][0]["speaker"] == "Alice"
+    assert updated["segments"][1]["speaker"] == "SPEAKER_01"

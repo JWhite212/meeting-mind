@@ -21,7 +21,7 @@ logger = logging.getLogger("meetingmind.db")
 DEFAULT_DB_DIR = Path(os.path.expanduser("~/.local/share/meetingmind"))
 DEFAULT_DB_PATH = DEFAULT_DB_DIR / "meetings.db"
 
-SCHEMA_VERSION = 3
+SCHEMA_VERSION = 4
 
 SCHEMA_SQL = """
 CREATE TABLE IF NOT EXISTS meetings (
@@ -72,6 +72,22 @@ CREATE INDEX IF NOT EXISTS idx_segment_embeddings_meeting
     ON segment_embeddings(meeting_id);
 """
 
+SPEAKER_MAPPINGS_SQL = """
+CREATE TABLE IF NOT EXISTS speaker_mappings (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    meeting_id TEXT NOT NULL,
+    speaker_id TEXT NOT NULL,
+    display_name TEXT NOT NULL,
+    source TEXT DEFAULT 'manual',
+    created_at REAL NOT NULL,
+    FOREIGN KEY (meeting_id) REFERENCES meetings(id) ON DELETE CASCADE,
+    UNIQUE(meeting_id, speaker_id)
+);
+
+CREATE INDEX IF NOT EXISTS idx_speaker_mappings_meeting
+    ON speaker_mappings(meeting_id);
+"""
+
 
 class Database:
     """Async SQLite database manager."""
@@ -120,6 +136,7 @@ class Database:
             except Exception:
                 logger.warning("FTS5 not available; full-text search disabled.")
             await self.conn.executescript(EMBEDDINGS_SQL)
+            await self.conn.executescript(SPEAKER_MAPPINGS_SQL)
             await self.conn.execute(f"PRAGMA user_version = {SCHEMA_VERSION}")
             await self.conn.commit()
             logger.info("Database schema created (version %d)", SCHEMA_VERSION)
@@ -128,11 +145,18 @@ class Database:
                 "ALTER TABLE meetings ADD COLUMN label TEXT NOT NULL DEFAULT ''"
             )
             await self.conn.executescript(EMBEDDINGS_SQL)
+            await self.conn.executescript(SPEAKER_MAPPINGS_SQL)
             await self.conn.execute(f"PRAGMA user_version = {SCHEMA_VERSION}")
             await self.conn.commit()
             logger.info("Database migrated to version %d", SCHEMA_VERSION)
         elif current_version < 3:
             await self.conn.executescript(EMBEDDINGS_SQL)
+            await self.conn.executescript(SPEAKER_MAPPINGS_SQL)
+            await self.conn.execute(f"PRAGMA user_version = {SCHEMA_VERSION}")
+            await self.conn.commit()
+            logger.info("Database migrated to version %d", SCHEMA_VERSION)
+        elif current_version < 4:
+            await self.conn.executescript(SPEAKER_MAPPINGS_SQL)
             await self.conn.execute(f"PRAGMA user_version = {SCHEMA_VERSION}")
             await self.conn.commit()
             logger.info("Database migrated to version %d", SCHEMA_VERSION)
@@ -156,17 +180,25 @@ class Database:
             except Exception:
                 logger.warning("FTS5 not available; full-text search disabled.")
             conn.executescript(EMBEDDINGS_SQL)
+            conn.executescript(SPEAKER_MAPPINGS_SQL)
             conn.execute(f"PRAGMA user_version = {SCHEMA_VERSION}")
             conn.commit()
             logger.info("Database schema created (version %d)", SCHEMA_VERSION)
         elif current_version < 2:
             conn.execute("ALTER TABLE meetings ADD COLUMN label TEXT NOT NULL DEFAULT ''")
             conn.executescript(EMBEDDINGS_SQL)
+            conn.executescript(SPEAKER_MAPPINGS_SQL)
             conn.execute(f"PRAGMA user_version = {SCHEMA_VERSION}")
             conn.commit()
             logger.info("Database migrated to version %d", SCHEMA_VERSION)
         elif current_version < 3:
             conn.executescript(EMBEDDINGS_SQL)
+            conn.executescript(SPEAKER_MAPPINGS_SQL)
+            conn.execute(f"PRAGMA user_version = {SCHEMA_VERSION}")
+            conn.commit()
+            logger.info("Database migrated to version %d", SCHEMA_VERSION)
+        elif current_version < 4:
+            conn.executescript(SPEAKER_MAPPINGS_SQL)
             conn.execute(f"PRAGMA user_version = {SCHEMA_VERSION}")
             conn.commit()
             logger.info("Database migrated to version %d", SCHEMA_VERSION)

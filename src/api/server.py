@@ -24,6 +24,7 @@ from src.api.routes import models as models_routes
 from src.api.routes import recording as recording_routes
 from src.api.routes import resummarise as resummarise_routes
 from src.api.routes import search as search_routes
+from src.api.routes import speakers as speakers_routes
 from src.api.routes import status as status_routes
 from src.api.routes import templates as templates_routes
 from src.api.websocket import ConnectionManager
@@ -122,6 +123,7 @@ class ApiServer:
                 logger.warning("Failed to initialise embedder: %s", e)
 
         search_routes.init(self.repo, embedder)
+        speakers_routes.init(self.repo)
 
         # Register REST routers with auth dependency.
         auth_deps = [Depends(verify_token)]
@@ -135,6 +137,7 @@ class ApiServer:
         app.include_router(models_routes.router, dependencies=auth_deps)
         app.include_router(templates_routes.router, dependencies=auth_deps)
         app.include_router(search_routes.router, dependencies=auth_deps)
+        app.include_router(speakers_routes.router, dependencies=auth_deps)
 
         # WebSocket endpoint with token auth via query parameter.
         @app.websocket("/ws")
