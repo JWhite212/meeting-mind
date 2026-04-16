@@ -25,3 +25,6 @@ websockets>=14.0
 
 # Database
 aiosqlite>=0.21.0
+
+# ML-based speaker diarisation (optional — energy-based diarisation works without it)
+# pyannote.audio>=3.1
