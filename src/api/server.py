@@ -24,6 +24,7 @@ from src.api.routes import models as models_routes
 from src.api.routes import recording as recording_routes
 from src.api.routes import resummarise as resummarise_routes
 from src.api.routes import status as status_routes
+from src.api.routes import templates as templates_routes
 from src.api.websocket import ConnectionManager
 from src.db.database import Database
 from src.db.repository import MeetingRepository
@@ -104,9 +105,7 @@ class ApiServer:
         status_routes.init(self._get_daemon_state, self._get_active_meeting)
         meetings_routes.init(self.repo)
         config_routes.init(DEFAULT_CONFIG_PATH)
-        recording_routes.init(
-            self._start_recording, self._stop_recording, self._is_recording
-        )
+        recording_routes.init(self._start_recording, self._stop_recording, self._is_recording)
 
         export_routes.init(self.repo)
         resummarise_routes.init(self.repo)
@@ -122,6 +121,7 @@ class ApiServer:
         app.include_router(export_routes.router, dependencies=auth_deps)
         app.include_router(resummarise_routes.router, dependencies=auth_deps)
         app.include_router(models_routes.router, dependencies=auth_deps)
+        app.include_router(templates_routes.router, dependencies=auth_deps)
 
         # WebSocket endpoint with token auth via query parameter.
         @app.websocket("/ws")
@@ -171,9 +171,7 @@ class ApiServer:
         self._app = self._create_app()
 
         # Schedule periodic retention cleanup (every 6 hours).
-        self._retention_task = asyncio.create_task(
-            self._periodic_retention_cleanup()
-        )
+        self._retention_task = asyncio.create_task(self._periodic_retention_cleanup())
 
         uvi_config = uvicorn.Config(
             app=self._app,

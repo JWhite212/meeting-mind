@@ -476,7 +476,7 @@ class TestOllamaFallback:
                     tags=["test"],
                 )
                 result = summariser.summarise(transcript)
-                mock_claude.assert_called_once_with(transcript)
+                mock_claude.assert_called_once_with(transcript, None)
                 assert result.title == "Fallback"
 
     def test_ollama_timeout_without_claude_raises(self):
@@ -526,6 +526,8 @@ class TestOllamaFallback:
                 mock_ollama.assert_called_once()
                 mock_claude.assert_not_called()
                 assert result.title == "Success"
+
+
 # TestOllamaNumCtx
 # ---------------------------------------------------------------------------
 

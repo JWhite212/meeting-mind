@@ -24,6 +24,7 @@ from urllib.parse import urlparse
 import anthropic
 import httpx
 
+from src.templates import SummaryTemplate
 from src.transcriber import Transcript
 from src.utils.config import SummarisationConfig
 
@@ -299,6 +300,7 @@ class Summariser:
         transcript: Transcript,
         text: str,
         word_count: int,
+        template: SummaryTemplate | None = None,
     ) -> MeetingSummary:
         """Summarise a long transcript by chunking for Claude."""
         chunks = self._split_into_chunks(text)
@@ -348,8 +350,9 @@ class Summariser:
             f"cohesive meeting summary using the standard format.\n\n"
             f"{combined}"
         )
+        system_prompt = template.system_prompt if template else SUMMARISATION_PROMPT
         raw_markdown = self._claude_chat(
-            SUMMARISATION_PROMPT,
+            system_prompt,
             consolidation_msg,
         )
         if not raw_markdown:
@@ -363,7 +366,11 @@ class Summariser:
             )
         return MeetingSummary.from_markdown(raw_markdown)
 
-    def _summarise_claude(self, transcript: Transcript) -> MeetingSummary:
+    def _summarise_claude(
+        self,
+        transcript: Transcript,
+        template: SummaryTemplate | None = None,
+    ) -> MeetingSummary:
         """Summarise using the Anthropic Claude API."""
         text, word_count = self._prepare_transcript(transcript)
 
@@ -372,6 +379,7 @@ class Summariser:
                 transcript,
                 text,
                 word_count,
+                template,
             )
 
         logger.info(
@@ -385,8 +393,9 @@ class Summariser:
             text,
             word_count,
         )
+        system_prompt = template.system_prompt if template else SUMMARISATION_PROMPT
         raw_markdown = self._claude_chat(
-            SUMMARISATION_PROMPT,
+            system_prompt,
             user_content,
         )
         if not raw_markdown:
@@ -506,6 +515,7 @@ class Summariser:
         transcript: Transcript,
         text: str,
         word_count: int,
+        template: SummaryTemplate | None = None,
     ) -> MeetingSummary:
         """Summarise a long transcript by chunking for Ollama."""
         model = self._config.ollama_model
@@ -560,15 +570,20 @@ class Summariser:
             f"cohesive meeting summary using the standard format.\n\n"
             f"{combined}"
         )
+        system_prompt = template.system_prompt if template else SUMMARISATION_PROMPT
         raw_markdown = self._ollama_chat(
             base_url,
             model,
-            SUMMARISATION_PROMPT,
+            system_prompt,
             consolidation_msg,
         )
         return MeetingSummary.from_markdown(raw_markdown)
 
-    def _summarise_ollama(self, transcript: Transcript) -> MeetingSummary:
+    def _summarise_ollama(
+        self,
+        transcript: Transcript,
+        template: SummaryTemplate | None = None,
+    ) -> MeetingSummary:
         """Summarise using a local Ollama instance."""
         text, word_count = self._prepare_transcript(transcript)
         model = self._config.ollama_model
@@ -579,6 +594,7 @@ class Summariser:
                 transcript,
                 text,
                 word_count,
+                template,
             )
 
         logger.info(
@@ -592,30 +608,38 @@ class Summariser:
             text,
             word_count,
         )
+        system_prompt = template.system_prompt if template else SUMMARISATION_PROMPT
         raw_markdown = self._ollama_chat(
             base_url,
             model,
-            SUMMARISATION_PROMPT,
+            system_prompt,
             user_content,
         )
         return MeetingSummary.from_markdown(raw_markdown)
 
-    def summarise(self, transcript: Transcript) -> MeetingSummary:
+    def summarise(
+        self,
+        transcript: Transcript,
+        template: SummaryTemplate | None = None,
+    ) -> MeetingSummary:
         """
         Generate a structured summary from a meeting transcript
         using the configured backend.
+
+        When *template* is provided, its ``system_prompt`` is used
+        instead of the built-in ``SUMMARISATION_PROMPT``.
         """
         backend = self._config.backend.lower()
 
         if backend == "claude":
-            summary = self._summarise_claude(transcript)
+            summary = self._summarise_claude(transcript, template)
         elif backend == "ollama":
             try:
-                summary = self._summarise_ollama(transcript)
+                summary = self._summarise_ollama(transcript, template)
             except TimeoutError:
                 if self._config.anthropic_api_key:
                     logger.warning("Ollama timed out. Falling back to Claude API...")
-                    summary = self._summarise_claude(transcript)
+                    summary = self._summarise_claude(transcript, template)
                 else:
                     raise
         else:
