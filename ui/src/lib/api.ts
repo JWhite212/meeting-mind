@@ -9,6 +9,8 @@ import type {
   ModelsResponse,
   RecordingStartResponse,
   RecordingStopResponse,
+  ReindexResponse,
+  SearchResponse,
   StatusResponse,
   SummaryTemplate,
 } from "./types";
@@ -194,5 +196,21 @@ export async function saveTemplate(
 export async function deleteTemplate(name: string): Promise<void> {
   await request(`/api/templates/${encodeURIComponent(name)}`, {
     method: "DELETE",
+  });
+}
+
+export async function searchTranscripts(
+  query: string,
+  limit = 10,
+): Promise<SearchResponse> {
+  return request<SearchResponse>("/api/search", {
+    method: "POST",
+    body: JSON.stringify({ query, limit }),
+  });
+}
+
+export async function reindexMeetings(): Promise<ReindexResponse> {
+  return request<ReindexResponse>("/api/search/reindex", {
+    method: "POST",
   });
 }

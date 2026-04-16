@@ -15,6 +15,7 @@ import { Dashboard } from "./components/dashboard/Dashboard";
 import { MeetingList } from "./components/meetings/MeetingList";
 import { MeetingDetail } from "./components/meetings/MeetingDetail";
 import { Settings } from "./components/settings/Settings";
+import { Search } from "./components/search/Search";
 import { LiveView } from "./components/live/LiveView";
 import { CommandPalette } from "./components/common/CommandPalette";
 import { ToastProvider } from "./components/common/Toast";
@@ -46,7 +47,6 @@ function AppShell() {
   const [showOnboarding, setShowOnboarding] = useState(!isOnboardingComplete());
   useTraySync(state);
   useNotifications(lastEvent);
-
 
   const onWSEvent = useCallback(
     (event: WSEvent) => {
@@ -99,6 +99,7 @@ const router = createBrowserRouter(
       <Route path="/live" element={<LiveView />} />
       <Route path="/meetings" element={<MeetingList />} />
       <Route path="/meetings/:id" element={<MeetingDetail />} />
+      <Route path="/search" element={<Search />} />
       <Route path="/settings" element={<Settings />} />
     </Route>,
   ),
