@@ -36,6 +36,7 @@ from src.diariser import Diariser
 from src.output.markdown_writer import MarkdownWriter
 from src.output.notion_writer import NotionWriter
 from src.summariser import Summariser
+from src.templates import TemplateManager
 from src.transcriber import Transcriber
 from src.utils.config import load_config
 
@@ -306,11 +307,19 @@ class MeetingMind:
                 except Exception as e:
                     logger.error("Diarisation failed: %s", e, exc_info=True)
 
+        # Load default template for summarisation.
+        template = None
+        try:
+            tm = TemplateManager()
+            template = tm.get_template(self._config.summarisation.default_template)
+        except Exception as e:
+            logger.warning("Failed to load template: %s", e)
+
         # Step 3: Summarise.
         logger.info("Generating summary...")
         self._emit("pipeline.stage", meeting_id=meeting_id, stage="summarising")
         try:
-            summary = self._summariser.summarise(transcript)
+            summary = self._summariser.summarise(transcript, template=template)
         except Exception as e:
             logger.error("Summarisation failed: %s", e, exc_info=True)
             self._emit("pipeline.error", meeting_id=meeting_id, stage="summarising", error=str(e))

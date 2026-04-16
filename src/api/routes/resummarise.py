@@ -13,6 +13,7 @@ from fastapi import APIRouter, HTTPException
 
 from src.api.schemas import ResummariseResponse
 from src.summariser import Summariser
+from src.templates import TemplateManager
 from src.transcriber import Transcript, TranscriptSegment
 from src.utils.config import DEFAULT_CONFIG_PATH, SummarisationConfig, _build_dataclass
 
@@ -63,7 +64,7 @@ def _reconstruct_transcript(transcript_json: str, duration: float) -> Transcript
     response_model=ResummariseResponse,
     summary="Re-summarise meeting",
 )
-async def resummarise_meeting(meeting_id: str):
+async def resummarise_meeting(meeting_id: str, template_name: str | None = None):
     if not _repo:
         raise HTTPException(status_code=503, detail="Repository not available")
 
@@ -75,16 +76,22 @@ async def resummarise_meeting(meeting_id: str):
     if not meeting.transcript_json:
         raise HTTPException(status_code=400, detail="No transcript available for this meeting")
 
+    # Load template if specified.
+    template = None
+    if template_name:
+        tm = TemplateManager()
+        template = tm.get_template(template_name)
+        if not template:
+            raise HTTPException(status_code=404, detail=f"Template '{template_name}' not found")
+
     config = _load_summarisation_config()
-    transcript = _reconstruct_transcript(
-        meeting.transcript_json, meeting.duration_seconds or 0
-    )
+    transcript = _reconstruct_transcript(meeting.transcript_json, meeting.duration_seconds or 0)
 
     logger.info("Re-summarising meeting %s (%d segments)", meeting_id, len(transcript.segments))
 
     try:
         summariser = Summariser(config)
-        summary = await asyncio.to_thread(summariser.summarise, transcript)
+        summary = await asyncio.to_thread(summariser.summarise, transcript, template)
     except Exception as e:
         logger.error("Re-summarisation failed: %s", e, exc_info=True)
         raise HTTPException(
