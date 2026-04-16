@@ -79,8 +79,12 @@ def _make_summary():
 @patch("src.main.Transcriber")
 @patch("src.main.AudioCapture")
 def test_transcription_failure_does_not_crash_pipeline(
-    mock_capture_cls, mock_transcriber_cls, mock_detector_cls, mock_summariser_cls,
-    tmp_config, audio_file,
+    mock_capture_cls,
+    mock_transcriber_cls,
+    mock_detector_cls,
+    mock_summariser_cls,
+    tmp_config,
+    audio_file,
 ):
     from src.main import MeetingMind
 
@@ -98,8 +102,12 @@ def test_transcription_failure_does_not_crash_pipeline(
 @patch("src.main.Transcriber")
 @patch("src.main.AudioCapture")
 def test_summarisation_failure_does_not_crash_pipeline(
-    mock_capture_cls, mock_transcriber_cls, mock_detector_cls, mock_summariser_cls,
-    tmp_config, audio_file,
+    mock_capture_cls,
+    mock_transcriber_cls,
+    mock_detector_cls,
+    mock_summariser_cls,
+    tmp_config,
+    audio_file,
 ):
     from src.main import MeetingMind
 
@@ -118,8 +126,12 @@ def test_summarisation_failure_does_not_crash_pipeline(
 @patch("src.main.Transcriber")
 @patch("src.main.AudioCapture")
 def test_short_transcript_skips_summarisation(
-    mock_capture_cls, mock_transcriber_cls, mock_detector_cls, mock_summariser_cls,
-    tmp_config, audio_file,
+    mock_capture_cls,
+    mock_transcriber_cls,
+    mock_detector_cls,
+    mock_summariser_cls,
+    tmp_config,
+    audio_file,
 ):
     from src.main import MeetingMind
 
@@ -137,8 +149,12 @@ def test_short_transcript_skips_summarisation(
 @patch("src.main.Transcriber")
 @patch("src.main.AudioCapture")
 def test_diarisation_conditional_execution(
-    mock_capture_cls, mock_transcriber_cls, mock_detector_cls, mock_summariser_cls,
-    tmp_path, audio_file,
+    mock_capture_cls,
+    mock_transcriber_cls,
+    mock_detector_cls,
+    mock_summariser_cls,
+    tmp_path,
+    audio_file,
 ):
     from src.main import MeetingMind
 
@@ -159,9 +175,9 @@ def test_diarisation_conditional_execution(
     config_path = tmp_path / "config.yaml"
     config_path.write_text(yaml.dump(config))
 
-    with patch("src.main.Diariser") as mock_diariser_cls:
-        mock_diariser = MagicMock()
-        mock_diariser_cls.return_value = mock_diariser
+    with patch("src.main.create_diariser") as mock_factory:
+        mock_diariser = MagicMock(spec=["diarise"])
+        mock_factory.return_value = mock_diariser
 
         app = MeetingMind(config_path=config_path)
         transcript = _make_transcript()
@@ -169,14 +185,6 @@ def test_diarisation_conditional_execution(
         # Diariser.diarise returns the (mutated) transcript.
         mock_diariser.diarise.return_value = transcript
         app._summariser.summarise.return_value = _make_summary()
-
-        # Set source file paths on the capture mock.
-        sys_path = tmp_path / "system.wav"
-        mic_path = tmp_path / "mic.wav"
-        sys_path.write_bytes(b"RIFF" + b"\x00" * 40)
-        mic_path.write_bytes(b"RIFF" + b"\x00" * 40)
-        app._capture.system_audio_path = sys_path
-        app._capture.mic_audio_path = mic_path
 
         app._process_audio(audio_file, started_at=1000.0, duration_seconds=60.0)
 
@@ -188,8 +196,12 @@ def test_diarisation_conditional_execution(
 @patch("src.main.Transcriber")
 @patch("src.main.AudioCapture")
 def test_markdown_writer_conditional_execution(
-    mock_capture_cls, mock_transcriber_cls, mock_detector_cls, mock_summariser_cls,
-    tmp_path, audio_file,
+    mock_capture_cls,
+    mock_transcriber_cls,
+    mock_detector_cls,
+    mock_summariser_cls,
+    tmp_path,
+    audio_file,
 ):
     from src.main import MeetingMind
 
@@ -227,8 +239,12 @@ def test_markdown_writer_conditional_execution(
 @patch("src.main.Transcriber")
 @patch("src.main.AudioCapture")
 def test_notion_writer_failure_isolated(
-    mock_capture_cls, mock_transcriber_cls, mock_detector_cls, mock_summariser_cls,
-    tmp_path, audio_file,
+    mock_capture_cls,
+    mock_transcriber_cls,
+    mock_detector_cls,
+    mock_summariser_cls,
+    tmp_path,
+    audio_file,
 ):
     from src.main import MeetingMind
 
@@ -248,8 +264,10 @@ def test_notion_writer_failure_isolated(
     config_path = tmp_path / "config.yaml"
     config_path.write_text(yaml.dump(config))
 
-    with patch("src.main.MarkdownWriter") as mock_md_cls, \
-         patch("src.main.NotionWriter") as mock_notion_cls:
+    with (
+        patch("src.main.MarkdownWriter") as mock_md_cls,
+        patch("src.main.NotionWriter") as mock_notion_cls,
+    ):
         mock_md_writer = MagicMock()
         mock_md_cls.return_value = mock_md_writer
         mock_notion_writer = MagicMock()
@@ -274,8 +292,12 @@ def test_notion_writer_failure_isolated(
 @patch("src.main.Transcriber")
 @patch("src.main.AudioCapture")
 def test_audio_persistence_fallback_to_copy(
-    mock_capture_cls, mock_transcriber_cls, mock_detector_cls, mock_summariser_cls,
-    tmp_config, tmp_path,
+    mock_capture_cls,
+    mock_transcriber_cls,
+    mock_detector_cls,
+    mock_summariser_cls,
+    tmp_config,
+    tmp_path,
 ):
     from src.main import MeetingMind
 
