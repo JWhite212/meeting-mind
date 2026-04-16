@@ -1,15 +1,16 @@
-"""Tests for the Diariser and energy-based speaker labelling."""
+"""Tests for the EnergyDiariser, factory function, and energy-based speaker labelling."""
 
 import numpy as np
 import pytest
 import soundfile as sf
 
-from src.diariser import DiarisationConfig, Diariser
+from src.diariser import DiarisationConfig, EnergyDiariser, create_diariser
 from src.transcriber import Transcript, TranscriptSegment
 
 # ---------------------------------------------------------------------------
 # Helpers
 # ---------------------------------------------------------------------------
+
 
 def _make_wav(path, data, sr=16000):
     """Write a numpy array to a WAV file."""
@@ -27,10 +28,10 @@ def _silence(duration_s=1.0, sr=16000):
     return np.zeros(int(sr * duration_s), dtype=np.float32)
 
 
-def _make_diariser(**kwargs) -> Diariser:
-    """Create a Diariser with default config, overridable via kwargs."""
+def _make_diariser(**kwargs) -> EnergyDiariser:
+    """Create an EnergyDiariser with default config, overridable via kwargs."""
     config = DiarisationConfig(enabled=True, **kwargs)
-    return Diariser(config)
+    return EnergyDiariser(config)
 
 
 def _make_transcript(segments: list[TranscriptSegment]) -> Transcript:
@@ -48,6 +49,7 @@ def _make_transcript(segments: list[TranscriptSegment]) -> Transcript:
 # Tests
 # ---------------------------------------------------------------------------
 
+
 class TestDiariser:
     def test_missing_system_audio_raises(self, tmp_path):
         mic_path = tmp_path / "mic.wav"
@@ -55,9 +57,11 @@ class TestDiariser:
         system_path = tmp_path / "system.wav"  # Does not exist.
 
         diariser = _make_diariser()
-        transcript = _make_transcript([
-            TranscriptSegment(start=0.0, end=0.5, text="hello"),
-        ])
+        transcript = _make_transcript(
+            [
+                TranscriptSegment(start=0.0, end=0.5, text="hello"),
+            ]
+        )
 
         with pytest.raises(FileNotFoundError, match="system audio"):
             diariser.diarise(transcript, system_path, mic_path)
@@ -68,9 +72,11 @@ class TestDiariser:
         mic_path = tmp_path / "mic.wav"  # Does not exist.
 
         diariser = _make_diariser()
-        transcript = _make_transcript([
-            TranscriptSegment(start=0.0, end=0.5, text="hello"),
-        ])
+        transcript = _make_transcript(
+            [
+                TranscriptSegment(start=0.0, end=0.5, text="hello"),
+            ]
+        )
 
         with pytest.raises(FileNotFoundError, match="mic audio"):
             diariser.diarise(transcript, system_path, mic_path)
@@ -82,9 +88,11 @@ class TestDiariser:
         _make_wav(mic_path, _silence(sr=44100), sr=44100)
 
         diariser = _make_diariser()
-        transcript = _make_transcript([
-            TranscriptSegment(start=0.0, end=0.5, text="hello"),
-        ])
+        transcript = _make_transcript(
+            [
+                TranscriptSegment(start=0.0, end=0.5, text="hello"),
+            ]
+        )
 
         with pytest.raises(ValueError, match="Sample rate mismatch"):
             diariser.diarise(transcript, system_path, mic_path)
@@ -96,9 +104,11 @@ class TestDiariser:
         _make_wav(mic_path, _sine_wave())
 
         diariser = _make_diariser()
-        transcript = _make_transcript([
-            TranscriptSegment(start=0.0, end=0.5, text="I am speaking"),
-        ])
+        transcript = _make_transcript(
+            [
+                TranscriptSegment(start=0.0, end=0.5, text="I am speaking"),
+            ]
+        )
 
         result = diariser.diarise(transcript, system_path, mic_path)
         assert result.segments[0].speaker == "Me"
@@ -110,9 +120,11 @@ class TestDiariser:
         _make_wav(mic_path, _silence())
 
         diariser = _make_diariser()
-        transcript = _make_transcript([
-            TranscriptSegment(start=0.0, end=0.5, text="Remote speaking"),
-        ])
+        transcript = _make_transcript(
+            [
+                TranscriptSegment(start=0.0, end=0.5, text="Remote speaking"),
+            ]
+        )
 
         result = diariser.diarise(transcript, system_path, mic_path)
         assert result.segments[0].speaker == "Remote"
@@ -125,9 +137,11 @@ class TestDiariser:
         _make_wav(mic_path, _sine_wave(amplitude=0.5))
 
         diariser = _make_diariser()
-        transcript = _make_transcript([
-            TranscriptSegment(start=0.0, end=0.5, text="Both speaking"),
-        ])
+        transcript = _make_transcript(
+            [
+                TranscriptSegment(start=0.0, end=0.5, text="Both speaking"),
+            ]
+        )
 
         result = diariser.diarise(transcript, system_path, mic_path)
         assert result.segments[0].speaker == "Me + Remote"
@@ -141,9 +155,11 @@ class TestDiariser:
 
         diariser = _make_diariser()
         # Segment starts at 100s, far beyond the 1s file.
-        transcript = _make_transcript([
-            TranscriptSegment(start=100.0, end=105.0, text="Way past end"),
-        ])
+        transcript = _make_transcript(
+            [
+                TranscriptSegment(start=100.0, end=105.0, text="Way past end"),
+            ]
+        )
 
         result = diariser.diarise(transcript, system_path, mic_path)
         assert result.segments[0].speaker == ""
@@ -161,7 +177,7 @@ class TestDiariser:
         assert result.segments == []
 
     def test_rms_empty_array_returns_zero(self):
-        assert Diariser._rms(np.array([])) == 0.0
+        assert EnergyDiariser._rms(np.array([])) == 0.0
 
     def test_custom_energy_threshold(self, tmp_path):
         """Very high threshold means neither source dominates -> both label."""
@@ -172,9 +188,11 @@ class TestDiariser:
         _make_wav(mic_path, _sine_wave(amplitude=0.5))
 
         diariser = _make_diariser(energy_ratio_threshold=100.0)
-        transcript = _make_transcript([
-            TranscriptSegment(start=0.0, end=0.5, text="Ambiguous"),
-        ])
+        transcript = _make_transcript(
+            [
+                TranscriptSegment(start=0.0, end=0.5, text="Ambiguous"),
+            ]
+        )
 
         result = diariser.diarise(transcript, system_path, mic_path)
         assert result.segments[0].speaker == "Me + Remote"
@@ -187,9 +205,11 @@ class TestDiariser:
         _make_wav(mic_path, _sine_wave())
 
         diariser = _make_diariser(speaker_name="Alice", remote_label="Bob")
-        transcript = _make_transcript([
-            TranscriptSegment(start=0.0, end=0.5, text="Alice speaking"),
-        ])
+        transcript = _make_transcript(
+            [
+                TranscriptSegment(start=0.0, end=0.5, text="Alice speaking"),
+            ]
+        )
 
         result = diariser.diarise(transcript, system_path, mic_path)
         assert result.segments[0].speaker == "Alice"
@@ -202,9 +222,11 @@ class TestDiariser:
         _make_wav(mic_path, _sine_wave())
 
         diariser = _make_diariser()
-        transcript = _make_transcript([
-            TranscriptSegment(start=0.0, end=0.5, text="Test"),
-        ])
+        transcript = _make_transcript(
+            [
+                TranscriptSegment(start=0.0, end=0.5, text="Test"),
+            ]
+        )
 
         result = diariser.diarise(transcript, system_path, mic_path)
         assert result is transcript
@@ -220,10 +242,31 @@ class TestDiariser:
 
         diariser = _make_diariser()
         # Segment end exactly matches file duration.
-        transcript = _make_transcript([
-            TranscriptSegment(start=0.0, end=duration_s, text="Full file"),
-        ])
+        transcript = _make_transcript(
+            [
+                TranscriptSegment(start=0.0, end=duration_s, text="Full file"),
+            ]
+        )
 
         result = diariser.diarise(transcript, system_path, mic_path)
         # Should complete without error and assign a speaker label.
         assert result.segments[0].speaker != ""
+
+
+class TestCreateDiariser:
+    """Tests for the create_diariser factory function."""
+
+    def test_factory_returns_energy_diariser(self):
+        config = DiarisationConfig(enabled=True, backend="energy")
+        diariser = create_diariser(config)
+        assert isinstance(diariser, EnergyDiariser)
+
+    def test_factory_pyannote_not_installed(self):
+        config = DiarisationConfig(enabled=True, backend="pyannote")
+        with pytest.raises(ValueError, match="pyannote.audio"):
+            create_diariser(config)
+
+    def test_factory_unknown_backend(self):
+        config = DiarisationConfig(enabled=True, backend="unknown")
+        with pytest.raises(ValueError, match="Unknown diarisation backend"):
+            create_diariser(config)

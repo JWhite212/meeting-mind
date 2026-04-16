@@ -1,19 +1,21 @@
 """
-Energy-based speaker diarisation.
+Speaker diarisation with pluggable backends.
 
-Compares RMS energy levels between the system audio (remote participants)
-and microphone audio (local user) for each transcript segment to determine
-who was speaking. No ML dependencies — just signal-level comparison
-leveraging the dual-source recording architecture.
+Provides a ``DiariserBackend`` Protocol for backends that operate on a
+single combined audio file (e.g. pyannote) and a concrete
+``EnergyDiariser`` that compares RMS energy between separate system and
+microphone recordings.
 
-Requires separate source WAV files from audio capture
-(audio.keep_source_files must be true, set automatically when
-diarisation is enabled).
+Use :func:`create_diariser` to obtain the appropriate backend from a
+:class:`DiarisationConfig`.
 """
+
+from __future__ import annotations
 
 import logging
 from dataclasses import dataclass
 from pathlib import Path
+from typing import Protocol, runtime_checkable
 
 import numpy as np
 import soundfile as sf
@@ -26,12 +28,24 @@ logger = logging.getLogger(__name__)
 @dataclass
 class DiarisationConfig:
     enabled: bool = False
-    speaker_name: str = "Me"           # Label for the local user.
-    remote_label: str = "Remote"       # Label for remote participants.
+    speaker_name: str = "Me"  # Label for the local user.
+    remote_label: str = "Remote"  # Label for remote participants.
     energy_ratio_threshold: float = 1.5  # How much louder one source must be.
+    backend: str = "energy"  # "energy" or "pyannote"
+    pyannote_model: str = "pyannote/speaker-diarization-3.1"
+    num_speakers: int = 0  # 0 = auto-detect
 
 
-class Diariser:
+@runtime_checkable
+class DiariserBackend(Protocol):
+    """Protocol for diarisation backends that use a single combined audio file."""
+
+    def diarise(self, transcript: Transcript, audio_path: Path) -> Transcript:
+        """Label each segment in *transcript* with a speaker identifier."""
+        ...
+
+
+class EnergyDiariser:
     """
     Labels transcript segments with speaker identifiers by comparing
     energy levels between mic and system audio recordings.
@@ -62,17 +76,16 @@ class Diariser:
             (mic_audio_path, "mic audio"),
         ]:
             if not path.exists():
-                raise FileNotFoundError(
-                    f"Diarisation requires {label} file: {path}"
-                )
+                raise FileNotFoundError(f"Diarisation requires {label} file: {path}")
 
         threshold = self._config.energy_ratio_threshold
         me = self._config.speaker_name
         remote = self._config.remote_label
 
-        with sf.SoundFile(str(system_audio_path)) as system_sf, \
-             sf.SoundFile(str(mic_audio_path)) as mic_sf:
-
+        with (
+            sf.SoundFile(str(system_audio_path)) as system_sf,
+            sf.SoundFile(str(mic_audio_path)) as mic_sf,
+        ):
             if system_sf.samplerate != mic_sf.samplerate:
                 raise ValueError(
                     f"Sample rate mismatch: system={system_sf.samplerate}Hz, "
@@ -95,14 +108,10 @@ class Diariser:
                     continue
 
                 system_sf.seek(start_sample)
-                sys_window = system_sf.read(
-                    frames=num_frames, dtype="float32"
-                )
+                sys_window = system_sf.read(frames=num_frames, dtype="float32")
 
                 mic_sf.seek(start_sample)
-                mic_window = mic_sf.read(
-                    frames=num_frames, dtype="float32"
-                )
+                mic_window = mic_sf.read(frames=num_frames, dtype="float32")
 
                 sys_rms = self._rms(sys_window)
                 mic_rms = self._rms(mic_window)
@@ -127,4 +136,39 @@ class Diariser:
         """Calculate RMS of an audio array."""
         if len(audio) == 0:
             return 0.0
-        return float(np.sqrt(np.mean(audio ** 2)))
+        return float(np.sqrt(np.mean(audio**2)))
+
+
+def create_diariser(config: DiarisationConfig) -> DiariserBackend | EnergyDiariser:
+    """
+    Factory function that returns the appropriate diariser backend.
+
+    Args:
+        config: Diarisation configuration specifying which backend to use.
+
+    Returns:
+        An ``EnergyDiariser`` for the ``"energy"`` backend, or a
+        ``DiariserBackend``-compatible object for other backends.
+
+    Raises:
+        ValueError: If the requested backend is unknown or its
+            dependencies are not installed.
+    """
+    backend = config.backend
+
+    if backend == "energy":
+        return EnergyDiariser(config)
+
+    if backend == "pyannote":
+        try:
+            import pyannote.audio  # noqa: F401
+        except ImportError:
+            raise ValueError(
+                "Pyannote backend requires 'pyannote.audio' and its dependencies. "
+                "Install with: pip install pyannote.audio"
+            )
+        raise ValueError("Pyannote backend is not yet implemented.")
+
+    raise ValueError(
+        f"Unknown diarisation backend: {backend!r}. Supported backends: 'energy', 'pyannote'."
+    )

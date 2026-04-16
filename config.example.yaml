@@ -120,6 +120,15 @@ diarisation:
   # are more decisive; higher values produce more "crosstalk" labels.
   energy_ratio_threshold: 1.5
 
+  # Backend: "energy" (RMS comparison, no ML) or "pyannote" (ML-based, requires torch).
+  backend: "energy"
+
+  # Pyannote model (used when backend: pyannote). Requires HuggingFace token.
+  pyannote_model: "pyannote/speaker-diarization-3.1"
+
+  # Number of speakers (0 = auto-detect, used by pyannote backend).
+  num_speakers: 0
+
 # --- Output: Markdown Vault ---
 markdown:
   enabled: true
