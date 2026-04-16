@@ -1,4 +1,6 @@
 import { NavLink } from "react-router-dom";
+import { useQuery } from "@tanstack/react-query";
+import { getMeetingStats } from "../../lib/api";
 
 const NAV_ITEMS = [
   { to: "/", label: "Dashboard", icon: "grid" },
@@ -109,6 +111,15 @@ interface SidebarProps {
 }
 
 export function Sidebar({ daemonRunning }: SidebarProps) {
+  const { data: stats } = useQuery({
+    queryKey: ["meeting-stats"],
+    queryFn: getMeetingStats,
+    enabled: daemonRunning,
+    refetchInterval: 30_000,
+  });
+
+  const badgeCount = (stats?.pending_count ?? 0) + (stats?.error_count ?? 0);
+
   return (
     <aside className="flex flex-col w-[220px] bg-sidebar border-r border-border shrink-0 h-full">
       {/* Titlebar drag region */}
@@ -138,6 +149,11 @@ export function Sidebar({ daemonRunning }: SidebarProps) {
           >
             <Icon name={item.icon} />
             {item.label}
+            {item.to === "/meetings" && badgeCount > 0 && (
+              <span className="ml-auto text-[10px] font-medium px-1.5 py-0.5 rounded-full bg-status-error/20 text-status-error">
+                {badgeCount}
+              </span>
+            )}
           </NavLink>
         ))}
       </nav>

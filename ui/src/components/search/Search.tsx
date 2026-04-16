@@ -1,7 +1,11 @@
 import { useState, useEffect, useRef } from "react";
 import { useNavigate } from "react-router-dom";
-import { useMutation } from "@tanstack/react-query";
-import { searchTranscripts, reindexMeetings } from "../../lib/api";
+import { useMutation, useQuery } from "@tanstack/react-query";
+import {
+  searchTranscripts,
+  reindexMeetings,
+  getMeetingLabels,
+} from "../../lib/api";
 import type { SearchResult } from "../../lib/types";
 import { useToast } from "../common/Toast";
 
@@ -19,6 +23,19 @@ export function Search() {
   const [isSearching, setIsSearching] = useState(false);
   const [hasSearched, setHasSearched] = useState(false);
   const inputRef = useRef<HTMLInputElement>(null);
+
+  const { data: labels = [] } = useQuery({
+    queryKey: ["meeting-labels"],
+    queryFn: getMeetingLabels,
+    staleTime: 30_000,
+  });
+
+  const EXAMPLE_QUERIES = [
+    "action items",
+    "decisions made",
+    "next steps",
+    "blockers",
+  ];
 
   const reindex = useMutation({
     mutationFn: reindexMeetings,
@@ -73,7 +90,7 @@ export function Search() {
         <button
           onClick={() => reindex.mutate()}
           disabled={reindex.isPending}
-          className="px-3 py-1.5 rounded-md bg-accent text-white text-sm hover:bg-accent/90 transition-colors disabled:opacity-50"
+          className="text-xs text-text-muted hover:text-text-secondary underline disabled:opacity-50"
         >
           {reindex.isPending ? "Re-indexing..." : "Re-index all meetings"}
         </button>
@@ -145,13 +162,49 @@ export function Search() {
       )}
 
       {!isSearching && !hasSearched && !query.trim() && (
-        <div className="flex flex-col items-center justify-center py-12 text-center">
-          <p className="text-sm text-text-secondary">
-            Search across all your meeting transcripts
-          </p>
-          <p className="text-xs text-text-muted mt-1">
-            Type a query above to find relevant transcript segments.
-          </p>
+        <div className="flex flex-col items-center justify-center py-12 text-center gap-4">
+          <div>
+            <p className="text-sm text-text-secondary">
+              Search across all your meeting transcripts
+            </p>
+            <p className="text-xs text-text-muted mt-1">
+              Type a query above to find relevant transcript segments.
+            </p>
+          </div>
+
+          {labels.length > 0 && (
+            <div className="flex flex-col items-center gap-1.5">
+              <span className="text-xs text-text-muted">
+                Try searching by label:
+              </span>
+              <div className="flex flex-wrap justify-center gap-1.5">
+                {labels.slice(0, 8).map((label) => (
+                  <button
+                    key={label}
+                    onClick={() => setQuery(label)}
+                    className="text-xs px-2.5 py-1 rounded-full bg-accent/10 text-accent hover:bg-accent/20 transition-colors"
+                  >
+                    {label}
+                  </button>
+                ))}
+              </div>
+            </div>
+          )}
+
+          <div className="flex flex-col items-center gap-1.5">
+            <span className="text-xs text-text-muted">Example queries:</span>
+            <div className="flex flex-wrap justify-center gap-1.5">
+              {EXAMPLE_QUERIES.map((example) => (
+                <button
+                  key={example}
+                  onClick={() => setQuery(example)}
+                  className="text-xs px-2.5 py-1 rounded-full bg-surface-raised border border-border text-text-secondary hover:bg-sidebar-hover transition-colors"
+                >
+                  {example}
+                </button>
+              ))}
+            </div>
+          </div>
         </div>
       )}
 

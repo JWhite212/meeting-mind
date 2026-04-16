@@ -9,7 +9,7 @@ from pathlib import Path
 from fastapi import APIRouter, HTTPException, Query, Request
 from fastapi.responses import FileResponse
 
-from src.api.schemas import DeleteResponse, MeetingListResponse
+from src.api.schemas import DeleteResponse, MeetingListResponse, MeetingStatsResponse
 from src.utils.config import load_config
 
 router = APIRouter()
@@ -29,13 +29,18 @@ async def list_meetings(
     offset: int = Query(0, ge=0),
     status: str | None = Query(None),
     q: str | None = Query(None),
+    tag: str | None = Query(None),
+    sort: str | None = Query(None),
 ):
     if q:
+        # FTS has its own ranking — ignore sort param when searching.
         meetings = await _repo.search_meetings(q, limit=limit)
     else:
-        meetings = await _repo.list_meetings(limit=limit, offset=offset, status=status)
+        meetings = await _repo.list_meetings(
+            limit=limit, offset=offset, status=status, tag=tag, sort=sort
+        )
 
-    total = await _repo.count_meetings(status=status)
+    total = await _repo.count_meetings(status=status, tag=tag)
 
     return {
         "meetings": [m.to_dict() for m in meetings],
@@ -112,6 +117,17 @@ async def merge_meetings(request: Request):
 async def get_meeting_labels():
     labels = await _repo.get_distinct_labels()
     return {"labels": labels}
+
+
+@router.get(
+    "/api/meetings/stats",
+    response_model=MeetingStatsResponse,
+    summary="Aggregate meeting stats",
+)
+async def get_meeting_stats():
+    if not _repo:
+        raise HTTPException(status_code=503, detail="Repository not available")
+    return await _repo.get_stats()
 
 
 @router.get("/api/meetings/{meeting_id}", summary="Get meeting by ID")

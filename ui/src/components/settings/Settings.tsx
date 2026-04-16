@@ -1,4 +1,4 @@
-import { useState, useEffect, useMemo, useCallback } from "react";
+import { useState, useEffect, useMemo, useCallback, useRef } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { useBlocker } from "react-router-dom";
 import { invoke } from "@tauri-apps/api/core";
@@ -18,6 +18,27 @@ import { useToast } from "../common/Toast";
 import { Tooltip } from "../common/Tooltip";
 import type { Theme } from "../../hooks/useTheme";
 import type { AppConfig, WhisperModel, SummaryTemplate } from "../../lib/types";
+
+/* ------------------------------------------------------------------ */
+/*  Section navigation definitions                                    */
+/* ------------------------------------------------------------------ */
+
+const SETTINGS_SECTIONS = [
+  { id: "appearance", label: "Appearance" },
+  { id: "detection", label: "Detection" },
+  { id: "audio", label: "Audio" },
+  { id: "transcription", label: "Transcription" },
+  { id: "models", label: "Models" },
+  { id: "summarisation", label: "Summarisation" },
+  { id: "diarisation", label: "Diarisation" },
+  { id: "markdown", label: "Markdown" },
+  { id: "notion", label: "Notion" },
+  { id: "retention", label: "Retention" },
+  { id: "logging", label: "Logging" },
+  { id: "templates", label: "Templates" },
+  { id: "daemon", label: "Daemon" },
+  { id: "about", label: "About" },
+] as const;
 
 /* ------------------------------------------------------------------ */
 /*  Reusable form primitives                                          */
@@ -76,16 +97,21 @@ function Field({
 }
 
 function Section({
+  id,
   title,
   description,
   children,
 }: {
+  id?: string;
   title: string;
   description?: string;
   children: React.ReactNode;
 }) {
   return (
-    <fieldset className="rounded-xl bg-surface-raised border border-border p-5">
+    <fieldset
+      id={id}
+      className="scroll-mt-20 rounded-xl bg-surface-raised border border-border p-5"
+    >
       <legend className="sr-only">{title}</legend>
       <h2 className="text-sm font-medium text-text-primary">{title}</h2>
       {description && (
@@ -106,10 +132,12 @@ function InfoRow({ label, value }: { label: string; value: string }) {
 }
 
 function ModelSection({
+  id,
   models,
   onDownload,
   downloading,
 }: {
+  id?: string;
   models: WhisperModel[];
   onDownload: (name: string) => void;
   downloading: boolean;
@@ -118,6 +146,7 @@ function ModelSection({
 
   return (
     <Section
+      id={id}
       title="Whisper Models"
       description="Download and manage transcription models"
     >
@@ -273,7 +302,7 @@ const BUILT_IN_TEMPLATES = [
   "client-call",
 ];
 
-function TemplatesSection() {
+function TemplatesSection({ id }: { id?: string }) {
   const queryClient = useQueryClient();
   const toast = useToast();
   const [creating, setCreating] = useState(false);
@@ -370,6 +399,7 @@ function TemplatesSection() {
 
   return (
     <Section
+      id={id}
       title="Summary Templates"
       description="Manage templates for meeting summarisation"
     >
@@ -710,6 +740,77 @@ export function Settings() {
   const toggleSecret = (key: string) =>
     setShowSecrets((prev) => ({ ...prev, [key]: !prev[key] }));
 
+  /* ------ Section navigation scroll-spy ------ */
+  const [activeSection, setActiveSection] = useState<string>(
+    SETTINGS_SECTIONS[0].id,
+  );
+  const navScrollRef = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    const ids = SETTINGS_SECTIONS.map((s) => s.id);
+    const elements = ids
+      .map((id) => document.getElementById(id))
+      .filter((el): el is HTMLElement => el !== null);
+
+    if (elements.length === 0) return;
+
+    const observer = new IntersectionObserver(
+      (entries) => {
+        // Collect all currently intersecting sections
+        const visible: { id: string; top: number }[] = [];
+        for (const entry of entries) {
+          if (entry.isIntersecting && entry.target.id) {
+            visible.push({
+              id: entry.target.id,
+              top: entry.boundingClientRect.top,
+            });
+          }
+        }
+        // Also check all observed elements in case some were already intersecting
+        // before this batch of entries
+        for (const el of elements) {
+          const rect = el.getBoundingClientRect();
+          // Element is in the active zone (top 40% of viewport)
+          if (rect.top < window.innerHeight * 0.4 && rect.bottom > 80) {
+            const already = visible.find((v) => v.id === el.id);
+            if (!already) {
+              visible.push({ id: el.id, top: rect.top });
+            }
+          }
+        }
+        if (visible.length > 0) {
+          // Pick the one closest to the top (but still below the nav)
+          visible.sort((a, b) => a.top - b.top);
+          const best =
+            visible.find((v) => v.top >= 0) ?? visible[visible.length - 1];
+          setActiveSection(best.id);
+        }
+      },
+      { rootMargin: "-80px 0px -60% 0px", threshold: 0 },
+    );
+
+    for (const el of elements) {
+      observer.observe(el);
+    }
+
+    return () => observer.disconnect();
+  }, [form, daemonRunning, configLoading]);
+
+  // Auto-scroll the nav bar to keep the active pill visible
+  useEffect(() => {
+    if (!navScrollRef.current) return;
+    const activeEl = navScrollRef.current.querySelector(
+      `[data-section="${activeSection}"]`,
+    );
+    if (activeEl) {
+      activeEl.scrollIntoView({
+        behavior: "smooth",
+        block: "nearest",
+        inline: "center",
+      });
+    }
+  }, [activeSection]);
+
   return (
     <div
       className="flex flex-col gap-4 p-6 max-w-3xl"
@@ -811,8 +912,41 @@ export function Settings() {
         </div>
       )}
 
+      {/* Section navigation */}
+      <nav
+        className="sticky top-0 z-20 -mx-6 px-6 py-2 bg-surface/80 backdrop-blur-sm border-b border-border"
+        aria-label="Settings sections"
+      >
+        <div
+          ref={navScrollRef}
+          className="flex gap-1.5 overflow-x-auto scrollbar-none"
+        >
+          {SETTINGS_SECTIONS.map((section) => (
+            <button
+              key={section.id}
+              data-section={section.id}
+              onClick={() => {
+                const el = document.getElementById(section.id);
+                if (el) el.scrollIntoView({ behavior: "smooth" });
+              }}
+              className={`px-3 py-1 text-xs rounded-full whitespace-nowrap transition-colors ${
+                activeSection === section.id
+                  ? "bg-accent text-white"
+                  : "text-text-secondary hover:bg-sidebar-hover"
+              }`}
+            >
+              {section.label}
+            </button>
+          ))}
+        </div>
+      </nav>
+
       {/* Appearance — always visible, not dependent on daemon */}
-      <Section title="Appearance" description="Theme and display preferences">
+      <Section
+        id="appearance"
+        title="Appearance"
+        description="Theme and display preferences"
+      >
         <Field
           label="Theme"
           help="Choose light, dark, or follow system preference"
@@ -876,6 +1010,7 @@ export function Settings() {
         <>
           {/* Detection */}
           <Section
+            id="detection"
             title="Meeting Detection"
             description="When and how meetings are detected"
           >
@@ -966,6 +1101,7 @@ export function Settings() {
 
           {/* Audio */}
           <Section
+            id="audio"
             title="Audio Capture"
             description="Audio device and recording settings"
           >
@@ -1059,6 +1195,7 @@ export function Settings() {
 
           {/* Transcription */}
           <Section
+            id="transcription"
             title="Transcription"
             description="Whisper model and inference settings"
           >
@@ -1127,6 +1264,7 @@ export function Settings() {
           {/* Whisper Models */}
           {modelsData && (
             <ModelSection
+              id="models"
               models={modelsData.models}
               onDownload={(name) => downloadMutation.mutate(name)}
               downloading={downloadMutation.isPending}
@@ -1135,6 +1273,7 @@ export function Settings() {
 
           {/* Summarisation */}
           <Section
+            id="summarisation"
             title="Summarisation"
             description="AI backend for generating meeting summaries"
           >
@@ -1239,6 +1378,7 @@ export function Settings() {
 
           {/* Diarisation */}
           <Section
+            id="diarisation"
             title="Speaker Diarisation"
             description="Energy-based speaker identification"
           >
@@ -1303,6 +1443,7 @@ export function Settings() {
 
           {/* Markdown output */}
           <Section
+            id="markdown"
             title="Markdown Output"
             description="Write summaries to an Obsidian vault"
           >
@@ -1356,6 +1497,7 @@ export function Settings() {
 
           {/* Notion output */}
           <Section
+            id="notion"
             title="Notion Output"
             description="Create meeting pages in a Notion database"
           >
@@ -1437,6 +1579,7 @@ export function Settings() {
 
           {/* Data Retention */}
           <Section
+            id="retention"
             title="Data Retention"
             description="Automatically clean up old data. Set to 0 to keep forever."
           >
@@ -1487,7 +1630,7 @@ export function Settings() {
           </Section>
 
           {/* Logging */}
-          <Section title="Logging">
+          <Section id="logging" title="Logging">
             <Field label="Log level">
               <select
                 value={form.logging.level}
@@ -1513,10 +1656,10 @@ export function Settings() {
       )}
 
       {/* Summary Templates — always visible when daemon is running */}
-      {daemonRunning && <TemplatesSection />}
+      {daemonRunning && <TemplatesSection id="templates" />}
 
       {/* Read-only info */}
-      <Section title="Daemon">
+      <Section id="daemon" title="Daemon">
         <InfoRow label="Status" value={daemonRunning ? "Running" : "Offline"} />
         <InfoRow label="State" value={state} />
         <InfoRow
@@ -1526,7 +1669,7 @@ export function Settings() {
         <InfoRow label="API" value="http://127.0.0.1:9876" />
       </Section>
 
-      <Section title="About">
+      <Section id="about" title="About">
         <InfoRow label="App" value="MeetingMind" />
         <InfoRow label="Version" value="0.1.0" />
         <InfoRow label="Platform" value="macOS (Tauri)" />

@@ -21,6 +21,13 @@ const STATUS_FILTERS: { label: string; value: MeetingStatus | "all" }[] = [
 const PAGE_SIZE = 100;
 const ROW_HEIGHT = 72;
 
+const SORT_OPTIONS = [
+  { label: "Newest first", value: "started_at:desc" },
+  { label: "Oldest first", value: "started_at:asc" },
+  { label: "Longest", value: "duration:desc" },
+  { label: "Most words", value: "word_count:desc" },
+] as const;
+
 export function MeetingList() {
   const navigate = useNavigate();
   const queryClient = useQueryClient();
@@ -31,19 +38,30 @@ export function MeetingList() {
   const [statusFilter, setStatusFilter] = useState<MeetingStatus | "all">(
     "all",
   );
+  const [tagFilter, setTagFilter] = useState<string | null>(null);
+  const [sortParam, setSortParam] = useState("started_at:desc");
   const [page, setPage] = useState(0);
   const listRef = useRef<HTMLDivElement>(null);
   const [selectMode, setSelectMode] = useState(false);
   const [selected, setSelected] = useState<Set<string>>(new Set());
 
   const { data, isLoading, isError, refetch } = useQuery({
-    queryKey: ["meetings", statusFilter, page, deferredSearch],
+    queryKey: [
+      "meetings",
+      statusFilter,
+      page,
+      deferredSearch,
+      tagFilter,
+      sortParam,
+    ],
     queryFn: () =>
       getMeetings(
         PAGE_SIZE,
         page * PAGE_SIZE,
         deferredSearch || undefined,
         statusFilter !== "all" ? statusFilter : undefined,
+        tagFilter ?? undefined,
+        sortParam,
       ),
     enabled: daemonRunning,
     staleTime: 10_000,
@@ -88,7 +106,7 @@ export function MeetingList() {
         </p>
       ) : (
         <>
-          {/* Search + filters */}
+          {/* Search + sort + select */}
           <div className="flex items-center gap-3">
             <input
               type="text"
@@ -101,6 +119,21 @@ export function MeetingList() {
               }}
               className="flex-1 px-3 py-1.5 text-sm rounded-lg bg-surface-raised border border-border text-text-primary placeholder:text-text-muted focus:outline-none focus:ring-1 focus:ring-accent"
             />
+            <select
+              value={sortParam}
+              onChange={(e) => {
+                setSortParam(e.target.value);
+                setPage(0);
+              }}
+              aria-label="Sort meetings"
+              className="px-3 py-1.5 text-xs rounded-lg bg-surface-raised border border-border text-text-secondary cursor-pointer focus:outline-none focus:ring-1 focus:ring-accent"
+            >
+              {SORT_OPTIONS.map((opt) => (
+                <option key={opt.value} value={opt.value}>
+                  {opt.label}
+                </option>
+              ))}
+            </select>
             <button
               onClick={() => {
                 setSelectMode((v) => !v);
@@ -156,6 +189,26 @@ export function MeetingList() {
             ))}
           </div>
 
+          {/* Active tag filter */}
+          {tagFilter && (
+            <div className="flex items-center gap-2">
+              <span className="text-xs text-text-muted">Tag:</span>
+              <span className="text-xs px-2 py-0.5 rounded-full bg-accent/10 text-accent flex items-center gap-1">
+                {tagFilter}
+                <button
+                  onClick={() => {
+                    setTagFilter(null);
+                    setPage(0);
+                  }}
+                  className="hover:text-text-primary"
+                  aria-label="Clear tag filter"
+                >
+                  &times;
+                </button>
+              </span>
+            </div>
+          )}
+
           {/* Meeting list */}
           {isLoading ? (
             <div role="status" aria-label="Loading meetings">
@@ -187,6 +240,10 @@ export function MeetingList() {
               selectMode={selectMode}
               selected={selected}
               onToggleSelect={toggleSelect}
+              onTagClick={(tag) => {
+                setTagFilter(tag);
+                setPage(0);
+              }}
             />
           )}
 
@@ -232,6 +289,7 @@ function VirtualMeetingList({
   selectMode,
   selected,
   onToggleSelect,
+  onTagClick,
 }: {
   meetings: Meeting[];
   onSelect: (id: string) => void;
@@ -239,6 +297,7 @@ function VirtualMeetingList({
   selectMode: boolean;
   selected: Set<string>;
   onToggleSelect: (id: string) => void;
+  onTagClick: (tag: string) => void;
 }) {
   const virtualizer = useVirtualizer({
     count: meetings.length,
@@ -259,6 +318,7 @@ function VirtualMeetingList({
               selectMode={selectMode}
               isSelected={selected.has(m.id)}
               onToggleSelect={onToggleSelect}
+              onTagClick={onTagClick}
             />
           </div>
         ))}
@@ -291,6 +351,7 @@ function VirtualMeetingList({
                 selectMode={selectMode}
                 isSelected={selected.has(m.id)}
                 onToggleSelect={onToggleSelect}
+                onTagClick={onTagClick}
               />
             </div>
           );
@@ -306,12 +367,14 @@ function MeetingRow({
   selectMode,
   isSelected,
   onToggleSelect,
+  onTagClick,
 }: {
   meeting: Meeting;
   onSelect: (id: string) => void;
   selectMode: boolean;
   isSelected: boolean;
   onToggleSelect: (id: string) => void;
+  onTagClick: (tag: string) => void;
 }) {
   return (
     <button
@@ -374,7 +437,11 @@ function MeetingRow({
             {m.tags.slice(0, 2).map((tag) => (
               <span
                 key={tag}
-                className="text-[10px] px-1.5 py-0.5 rounded bg-accent/10 text-accent"
+                onClick={(e) => {
+                  e.stopPropagation();
+                  onTagClick(tag);
+                }}
+                className="text-[10px] px-1.5 py-0.5 rounded bg-accent/10 text-accent cursor-pointer hover:bg-accent/20 transition-colors"
               >
                 {tag}
               </span>

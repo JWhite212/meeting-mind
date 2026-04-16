@@ -48,6 +48,15 @@ class MeetingListResponse(BaseModel):
     offset: int
 
 
+class MeetingStatsResponse(BaseModel):
+    meetings_today: int
+    meetings_this_week: int
+    total_hours: float
+    total_words: int
+    pending_count: int
+    error_count: int
+
+
 class DeleteResponse(BaseModel):
     deleted: bool
 

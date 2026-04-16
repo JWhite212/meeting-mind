@@ -1,11 +1,12 @@
-import { useQuery } from "@tanstack/react-query";
+import { useQuery, useQueryClient, useMutation } from "@tanstack/react-query";
 import { useNavigate } from "react-router-dom";
-import { getMeetings } from "../../lib/api";
+import { getMeetings, getMeetingStats, reprocessMeeting } from "../../lib/api";
 import { useDaemonStatus } from "../../hooks/useDaemonStatus";
 import { useAppStore } from "../../stores/appStore";
 import { EmptyState } from "../common/EmptyState";
 import { ErrorState } from "../common/ErrorState";
 import { SkeletonCard } from "../common/Skeleton";
+import { useToast } from "../common/Toast";
 
 function StatusCard() {
   const { daemonRunning, state, activeMeeting } = useDaemonStatus();
@@ -17,7 +18,9 @@ function StatusCard() {
         <div className="flex items-center gap-3">
           <span className="w-3 h-3 rounded-full bg-status-error" />
           <div>
-            <h3 className="text-sm font-medium text-text-primary">Daemon Offline</h3>
+            <h3 className="text-sm font-medium text-text-primary">
+              Daemon Offline
+            </h3>
             <p className="text-xs text-text-muted mt-0.5">
               Start the daemon to begin detecting meetings
             </p>
@@ -27,7 +30,10 @@ function StatusCard() {
     );
   }
 
-  const stateDisplay: Record<string, { label: string; color: string; description: string }> = {
+  const stateDisplay: Record<
+    string,
+    { label: string; color: string; description: string }
+  > = {
     idle: {
       label: "Idle",
       color: "bg-status-idle",
@@ -65,8 +71,12 @@ function StatusCard() {
       <div className="flex items-center gap-3">
         <span className={`w-3 h-3 rounded-full ${display.color}`} />
         <div>
-          <h3 className="text-sm font-medium text-text-primary">{display.label}</h3>
-          <p className="text-xs text-text-muted mt-0.5">{display.description}</p>
+          <h3 className="text-sm font-medium text-text-primary">
+            {display.label}
+          </h3>
+          <p className="text-xs text-text-muted mt-0.5">
+            {display.description}
+          </p>
         </div>
       </div>
     </div>
@@ -90,7 +100,9 @@ function RecentMeetings() {
 
   return (
     <div className="rounded-xl bg-surface-raised border border-border p-6">
-      <h2 className="text-sm font-medium text-text-primary mb-4">Recent Meetings</h2>
+      <h2 className="text-sm font-medium text-text-primary mb-4">
+        Recent Meetings
+      </h2>
       {isLoading ? (
         <div role="status" aria-label="Loading meetings">
           <div className="flex flex-col gap-2">
@@ -100,13 +112,26 @@ function RecentMeetings() {
           </div>
         </div>
       ) : isError ? (
-        <ErrorState message="Failed to load meetings." onRetry={() => refetch()} />
+        <ErrorState
+          message="Failed to load meetings."
+          onRetry={() => refetch()}
+        />
       ) : meetings.length === 0 ? (
         <EmptyState
           title="No meetings yet"
           description="Meetings will appear here once the daemon records and processes them."
           icon={
-            <svg width="36" height="36" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" className="text-text-muted/50">
+            <svg
+              width="36"
+              height="36"
+              viewBox="0 0 24 24"
+              fill="none"
+              stroke="currentColor"
+              strokeWidth="1.5"
+              strokeLinecap="round"
+              strokeLinejoin="round"
+              className="text-text-muted/50"
+            >
               <path d="M12 1a3 3 0 0 0-3 3v8a3 3 0 0 0 6 0V4a3 3 0 0 0-3-3z" />
               <path d="M19 10v2a7 7 0 0 1-14 0v-2" />
               <line x1="12" y1="19" x2="12" y2="23" />
@@ -126,7 +151,8 @@ function RecentMeetings() {
                 <p className="text-sm text-text-primary truncate">{m.title}</p>
                 <p className="text-xs text-text-muted">
                   {new Date(m.started_at * 1000).toLocaleDateString()}
-                  {m.duration_seconds && ` \u00B7 ${Math.round(m.duration_seconds / 60)}m`}
+                  {m.duration_seconds &&
+                    ` \u00B7 ${Math.round(m.duration_seconds / 60)}m`}
                 </p>
               </div>
               <span
@@ -148,11 +174,137 @@ function RecentMeetings() {
   );
 }
 
+function StatsRow() {
+  const { daemonRunning } = useDaemonStatus();
+
+  const { data: stats, isLoading } = useQuery({
+    queryKey: ["meeting-stats"],
+    queryFn: getMeetingStats,
+    enabled: daemonRunning,
+    refetchInterval: 30_000,
+  });
+
+  if (!daemonRunning) return null;
+
+  const tiles = [
+    { label: "Today", value: stats?.meetings_today ?? 0, suffix: "" },
+    { label: "This Week", value: stats?.meetings_this_week ?? 0, suffix: "" },
+    {
+      label: "Total Hours",
+      value: stats?.total_hours ?? 0,
+      suffix: "",
+      format: (v: number) => v.toFixed(1),
+    },
+    {
+      label: "Words Transcribed",
+      value: stats?.total_words ?? 0,
+      suffix: "",
+      format: (v: number) => v.toLocaleString(),
+    },
+  ];
+
+  if (isLoading) {
+    return (
+      <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
+        {Array.from({ length: 4 }).map((_, i) => (
+          <div
+            key={i}
+            className="rounded-xl bg-surface-raised border border-border p-4 animate-pulse h-[72px]"
+          />
+        ))}
+      </div>
+    );
+  }
+
+  return (
+    <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
+      {tiles.map((tile) => (
+        <div
+          key={tile.label}
+          className="rounded-xl bg-surface-raised border border-border p-4"
+        >
+          <p className="text-xs text-text-muted">{tile.label}</p>
+          <p className="text-2xl font-semibold text-text-primary tabular-nums mt-1">
+            {tile.format ? tile.format(tile.value) : tile.value}
+          </p>
+        </div>
+      ))}
+    </div>
+  );
+}
+
+function PendingCallout() {
+  const { daemonRunning } = useDaemonStatus();
+  const queryClient = useQueryClient();
+  const toast = useToast();
+
+  const { data: stats } = useQuery({
+    queryKey: ["meeting-stats"],
+    queryFn: getMeetingStats,
+    enabled: daemonRunning,
+    refetchInterval: 30_000,
+  });
+
+  const processAll = useMutation({
+    mutationFn: async () => {
+      const resp = await getMeetings(100, 0, undefined, "pending");
+      for (const m of resp.meetings) {
+        await reprocessMeeting(m.id);
+      }
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["meetings"] });
+      queryClient.invalidateQueries({ queryKey: ["meeting-stats"] });
+      toast.success("All pending meetings processed.");
+    },
+    onError: () => {
+      toast.error("Some meetings failed to process. Check the Meetings page.");
+    },
+  });
+
+  const count = stats?.pending_count ?? 0;
+  if (!daemonRunning || count === 0) return null;
+
+  return (
+    <div className="rounded-xl bg-amber-400/10 border border-amber-400/30 p-4 flex items-center justify-between gap-4">
+      <div className="flex items-center gap-3">
+        <svg
+          width="18"
+          height="18"
+          viewBox="0 0 24 24"
+          fill="none"
+          stroke="currentColor"
+          strokeWidth="2"
+          strokeLinecap="round"
+          strokeLinejoin="round"
+          className="text-amber-400 shrink-0"
+        >
+          <circle cx="12" cy="12" r="10" />
+          <polyline points="12 6 12 12 16 14" />
+        </svg>
+        <p className="text-sm text-text-primary">
+          <span className="font-medium">{count}</span> meeting
+          {count !== 1 ? "s" : ""} pending processing
+        </p>
+      </div>
+      <button
+        onClick={() => processAll.mutate()}
+        disabled={processAll.isPending}
+        className="px-3 py-1.5 text-xs rounded-lg bg-amber-400/20 text-amber-400 hover:bg-amber-400/30 transition-colors font-medium disabled:opacity-50"
+      >
+        {processAll.isPending ? "Processing..." : "Process All"}
+      </button>
+    </div>
+  );
+}
+
 export function Dashboard() {
   return (
     <div className="flex flex-col gap-4 p-6 max-w-3xl">
       <h1 className="text-lg font-semibold text-text-primary">Dashboard</h1>
       <StatusCard />
+      <StatsRow />
+      <PendingCallout />
       <RecentMeetings />
     </div>
   );

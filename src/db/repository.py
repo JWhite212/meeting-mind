@@ -129,6 +129,11 @@ class MeetingRepository:
 
         invalid = set(fields) - _MUTABLE_COLUMNS
         if invalid:
+            logger.warning(
+                "update_meeting: rejected disallowed column(s) %s for meeting %s",
+                invalid,
+                meeting_id,
+            )
             raise ValueError(f"Cannot update column(s): {invalid}")
 
         # Serialise tags as JSON.
@@ -151,28 +156,45 @@ class MeetingRepository:
         row = await cursor.fetchone()
         return MeetingRecord.from_row(row) if row else None
 
+    _SORT_MAP = {
+        "started_at:desc": "started_at DESC",
+        "started_at:asc": "started_at ASC",
+        "duration:desc": "duration_seconds DESC NULLS LAST, started_at DESC",
+        "word_count:desc": "word_count DESC NULLS LAST, started_at DESC",
+    }
+
     async def list_meetings(
         self,
         limit: int = 50,
         offset: int = 0,
         status: str | None = None,
+        tag: str | None = None,
+        sort: str | None = None,
     ) -> list[MeetingRecord]:
-        """List meetings, newest first."""
+        """List meetings with optional status/tag filters and sort order."""
+        conditions: list[str] = []
+        params: list = []
         if status:
-            cursor = await self._db.conn.execute(
-                "SELECT * FROM meetings WHERE status = ? ORDER BY started_at DESC LIMIT ? OFFSET ?",
-                (status, limit, offset),
-            )
-        else:
-            cursor = await self._db.conn.execute(
-                "SELECT * FROM meetings ORDER BY started_at DESC LIMIT ? OFFSET ?",
-                (limit, offset),
-            )
+            conditions.append("status = ?")
+            params.append(status)
+        if tag:
+            conditions.append("EXISTS (SELECT 1 FROM json_each(tags) WHERE json_each.value = ?)")
+            params.append(tag)
+        where = f"WHERE {' AND '.join(conditions)}" if conditions else ""
+        order = self._SORT_MAP.get(sort or "", "started_at DESC")
+        params.extend([limit, offset])
+        cursor = await self._db.conn.execute(
+            f"SELECT * FROM meetings {where} ORDER BY {order} LIMIT ? OFFSET ?",
+            params,
+        )
         rows = await cursor.fetchall()
         return [MeetingRecord.from_row(r) for r in rows]
 
     async def search_meetings(self, query: str, limit: int = 20) -> list[MeetingRecord]:
         """Full-text search across meeting title, summary, and transcript."""
+        # Wrap the query in double-quotes to treat it as a phrase search and
+        # prevent FTS5 operator abuse (AND/OR/NOT/* etc).
+        safe_query = '"' + query.replace('"', "") + '"'
         try:
             cursor = await self._db.conn.execute(
                 """
@@ -182,7 +204,7 @@ class MeetingRepository:
                 ORDER BY rank
                 LIMIT ?
                 """,
-                (query, limit),
+                (safe_query, limit),
             )
             rows = await cursor.fetchall()
             return [MeetingRecord.from_row(r) for r in rows]
@@ -206,16 +228,55 @@ class MeetingRepository:
         await self._db.conn.commit()
         return cursor.rowcount > 0
 
-    async def count_meetings(self, status: str | None = None) -> int:
-        """Count total meetings, optionally filtered by status."""
+    async def count_meetings(self, status: str | None = None, tag: str | None = None) -> int:
+        """Count total meetings, optionally filtered by status and/or tag."""
+        conditions: list[str] = []
+        params: list = []
         if status:
-            cursor = await self._db.conn.execute(
-                "SELECT COUNT(*) FROM meetings WHERE status = ?", (status,)
-            )
-        else:
-            cursor = await self._db.conn.execute("SELECT COUNT(*) FROM meetings")
+            conditions.append("status = ?")
+            params.append(status)
+        if tag:
+            conditions.append("EXISTS (SELECT 1 FROM json_each(tags) WHERE json_each.value = ?)")
+            params.append(tag)
+        where = f"WHERE {' AND '.join(conditions)}" if conditions else ""
+        cursor = await self._db.conn.execute(f"SELECT COUNT(*) FROM meetings {where}", params)
         row = await cursor.fetchone()
         return row[0]
+
+    async def get_stats(self) -> dict:
+        """Aggregate stats for the dashboard."""
+        import datetime
+
+        now = datetime.datetime.now(datetime.timezone.utc)
+        start_of_today = now.replace(hour=0, minute=0, second=0, microsecond=0).timestamp()
+        start_of_week = (
+            (now - datetime.timedelta(days=now.weekday()))
+            .replace(hour=0, minute=0, second=0, microsecond=0)
+            .timestamp()
+        )
+
+        cursor = await self._db.conn.execute(
+            """
+            SELECT
+                COALESCE(SUM(CASE WHEN started_at >= ? THEN 1 ELSE 0 END), 0),
+                COALESCE(SUM(CASE WHEN started_at >= ? THEN 1 ELSE 0 END), 0),
+                COALESCE(SUM(duration_seconds), 0) / 3600.0,
+                COALESCE(SUM(word_count), 0),
+                COALESCE(SUM(CASE WHEN status = 'pending' THEN 1 ELSE 0 END), 0),
+                COALESCE(SUM(CASE WHEN status = 'error' THEN 1 ELSE 0 END), 0)
+            FROM meetings
+            """,
+            (start_of_today, start_of_week),
+        )
+        row = await cursor.fetchone()
+        return {
+            "meetings_today": row[0],
+            "meetings_this_week": row[1],
+            "total_hours": round(row[2], 1),
+            "total_words": row[3],
+            "pending_count": row[4],
+            "error_count": row[5],
+        }
 
     async def get_distinct_labels(self) -> list[str]:
         """Return all unique non-empty labels, sorted alphabetically."""

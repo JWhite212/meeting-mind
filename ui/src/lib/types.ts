@@ -42,6 +42,15 @@ export interface Meeting {
   updated_at: number;
 }
 
+export interface MeetingStats {
+  meetings_today: number;
+  meetings_this_week: number;
+  total_hours: number;
+  total_words: number;
+  pending_count: number;
+  error_count: number;
+}
+
 export interface MeetingsResponse {
   meetings: Meeting[];
   total: number;

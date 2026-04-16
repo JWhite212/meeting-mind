@@ -145,6 +145,7 @@ function TranscriptView({
   onRenamed: () => void;
 }) {
   const [search, setSearch] = useState("");
+  const [copiedIndex, setCopiedIndex] = useState<number | null>(null);
 
   let segments: TranscriptSegment[] = [];
   try {
@@ -201,7 +202,7 @@ function TranscriptView({
             onKeyDown={(e) => {
               if (e.key === "Enter" || e.key === " ") onSeek?.(seg.start);
             }}
-            className={`flex gap-3 py-1.5 px-1 rounded-md text-left transition-colors ${
+            className={`group flex items-start gap-3 py-1.5 px-1 rounded-md text-left transition-colors ${
               onSeek ? "hover:bg-sidebar-hover cursor-pointer" : ""
             }`}
           >
@@ -226,6 +227,46 @@ function TranscriptView({
             <span className="text-sm text-text-primary leading-relaxed">
               <HighlightText text={seg.text} query={search.trim()} />
             </span>
+            <button
+              onClick={(e) => {
+                e.stopPropagation();
+                navigator.clipboard.writeText(seg.text);
+                setCopiedIndex(i);
+                setTimeout(() => setCopiedIndex(null), 1500);
+              }}
+              className="shrink-0 opacity-0 group-hover:opacity-100 transition-opacity p-1 rounded hover:bg-sidebar-hover text-text-muted hover:text-text-primary"
+              aria-label="Copy segment text"
+              title="Copy to clipboard"
+            >
+              {copiedIndex === i ? (
+                <svg
+                  width="14"
+                  height="14"
+                  viewBox="0 0 24 24"
+                  fill="none"
+                  stroke="currentColor"
+                  strokeWidth="2"
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                >
+                  <polyline points="20 6 9 17 4 12" />
+                </svg>
+              ) : (
+                <svg
+                  width="14"
+                  height="14"
+                  viewBox="0 0 24 24"
+                  fill="none"
+                  stroke="currentColor"
+                  strokeWidth="2"
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                >
+                  <rect x="9" y="9" width="13" height="13" rx="2" ry="2" />
+                  <path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1" />
+                </svg>
+              )}
+            </button>
           </div>
         ))}
         {query && filtered.length === 0 && (

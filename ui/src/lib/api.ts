@@ -4,6 +4,7 @@ import type {
   AppConfig,
   DevicesResponse,
   HealthResponse,
+  MeetingStats,
   MeetingsResponse,
   Meeting,
   ModelsResponse,
@@ -65,6 +66,8 @@ export async function getMeetings(
   offset = 0,
   query?: string,
   status?: string,
+  tag?: string,
+  sort?: string,
 ): Promise<MeetingsResponse> {
   const params = new URLSearchParams({
     limit: String(limit),
@@ -72,7 +75,13 @@ export async function getMeetings(
   });
   if (query) params.set("q", query);
   if (status) params.set("status", status);
+  if (tag) params.set("tag", tag);
+  if (sort) params.set("sort", sort);
   return request<MeetingsResponse>(`/api/meetings?${params}`);
+}
+
+export async function getMeetingStats(): Promise<MeetingStats> {
+  return request<MeetingStats>("/api/meetings/stats");
 }
 
 export async function getMeeting(id: string): Promise<Meeting> {
