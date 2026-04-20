@@ -34,6 +34,8 @@ _MUTABLE_COLUMNS = frozenset(
         "calendar_event_title",
         "attendees_json",
         "calendar_confidence",
+        "teams_join_url",
+        "teams_meeting_id",
         "updated_at",
     }
 )
@@ -61,6 +63,8 @@ class MeetingRecord:
     calendar_event_title: str = ""
     attendees_json: str = "[]"
     calendar_confidence: float = 0.0
+    teams_join_url: str = ""
+    teams_meeting_id: str = ""
 
     def to_dict(self) -> dict[str, Any]:
         return {
@@ -80,6 +84,8 @@ class MeetingRecord:
             "calendar_event_title": self.calendar_event_title,
             "attendees_json": self.attendees_json,
             "calendar_confidence": self.calendar_confidence,
+            "teams_join_url": self.teams_join_url,
+            "teams_meeting_id": self.teams_meeting_id,
             "created_at": self.created_at,
             "updated_at": self.updated_at,
         }
@@ -93,10 +99,14 @@ class MeetingRecord:
         calendar_event_title = ""
         attendees_json = "[]"
         calendar_confidence = 0.0
+        teams_join_url = ""
+        teams_meeting_id = ""
         try:
             calendar_event_title = row["calendar_event_title"] or ""
             attendees_json = row["attendees_json"] or "[]"
             calendar_confidence = row["calendar_confidence"] or 0.0
+            teams_join_url = row["teams_join_url"] or ""
+            teams_meeting_id = row["teams_meeting_id"] or ""
         except (IndexError, KeyError):
             pass
 
@@ -119,6 +129,8 @@ class MeetingRecord:
             calendar_event_title=calendar_event_title,
             attendees_json=attendees_json,
             calendar_confidence=calendar_confidence,
+            teams_join_url=teams_join_url,
+            teams_meeting_id=teams_meeting_id,
         )
 
 
@@ -214,6 +226,20 @@ class MeetingRepository:
         cursor = await self._db.conn.execute(
             f"SELECT * FROM meetings {where} ORDER BY {order} LIMIT ? OFFSET ?",
             params,
+        )
+        rows = await cursor.fetchall()
+        return [MeetingRecord.from_row(r) for r in rows]
+
+    async def list_meetings_by_date_range(
+        self, start_ts: float, end_ts: float, limit: int = 1000
+    ) -> list[MeetingRecord]:
+        """List meetings whose started_at falls within [start_ts, end_ts)."""
+        cursor = await self._db.conn.execute(
+            "SELECT * FROM meetings"
+            " WHERE started_at >= ? AND started_at < ?"
+            " ORDER BY started_at ASC"
+            " LIMIT ?",
+            (start_ts, end_ts, limit),
         )
         rows = await cursor.fetchall()
         return [MeetingRecord.from_row(r) for r in rows]
