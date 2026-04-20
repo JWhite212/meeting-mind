@@ -32,8 +32,10 @@ async def engine(db: Database, repo, analytics_repo, ai_repo):
 
 @pytest.mark.asyncio
 async def test_compute_daily_analytics(engine, repo, analytics_repo):
-    now = datetime.now(timezone.utc)
-    ts = now.timestamp()
+    # Use a fixed date at noon UTC to avoid midnight boundary issues.
+    fixed = datetime(2026, 4, 15, 12, 0, tzinfo=timezone.utc)
+    ts = fixed.timestamp()
+    day_str = fixed.strftime("%Y-%m-%d")
     attendees = json.dumps([{"name": "A", "email": "a@co.com"}])
     m1 = await repo.create_meeting(started_at=ts)
     await repo.update_meeting(
@@ -53,8 +55,8 @@ async def test_compute_daily_analytics(engine, repo, analytics_repo):
         attendees_json=attendees,
         ended_at=ts + 7200,
     )
-    await engine.refresh_period("daily", now.strftime("%Y-%m-%d"))
-    row = await analytics_repo.get_period("daily", now.strftime("%Y-%m-%d"))
+    await engine.refresh_period("daily", day_str)
+    row = await analytics_repo.get_period("daily", day_str)
     assert row is not None
     assert row["total_meetings"] == 2
     assert row["total_duration_minutes"] == 90
