@@ -34,9 +34,14 @@ export function EventCard({ meeting, compact = false }: EventCardProps) {
     );
   }
 
-  const attendees = meeting.attendees_json
-    ? JSON.parse(meeting.attendees_json)
-    : [];
+  let attendees: { name: string; email: string }[] = [];
+  try {
+    attendees = meeting.attendees_json
+      ? JSON.parse(meeting.attendees_json)
+      : [];
+  } catch {
+    // Malformed JSON — safe to ignore.
+  }
 
   return (
     <button

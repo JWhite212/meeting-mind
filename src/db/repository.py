@@ -231,14 +231,15 @@ class MeetingRepository:
         return [MeetingRecord.from_row(r) for r in rows]
 
     async def list_meetings_by_date_range(
-        self, start_ts: float, end_ts: float
+        self, start_ts: float, end_ts: float, limit: int = 1000
     ) -> list[MeetingRecord]:
         """List meetings whose started_at falls within [start_ts, end_ts)."""
         cursor = await self._db.conn.execute(
             "SELECT * FROM meetings"
             " WHERE started_at >= ? AND started_at < ?"
-            " ORDER BY started_at ASC",
-            (start_ts, end_ts),
+            " ORDER BY started_at ASC"
+            " LIMIT ?",
+            (start_ts, end_ts, limit),
         )
         rows = await cursor.fetchall()
         return [MeetingRecord.from_row(r) for r in rows]

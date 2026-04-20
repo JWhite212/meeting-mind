@@ -60,6 +60,8 @@ function AppShell() {
         event.type === "meeting.resummarise"
       ) {
         queryClient.invalidateQueries({ queryKey: ["meetings"] });
+        queryClient.invalidateQueries({ queryKey: ["calendar"] });
+        queryClient.invalidateQueries({ queryKey: ["calendar-heatmap"] });
         if (event.meeting_id) {
           queryClient.invalidateQueries({
             queryKey: ["meeting", event.meeting_id],
