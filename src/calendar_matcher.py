@@ -8,7 +8,6 @@ All processing is local -- no cloud API calls.
 Requires macOS and the pyobjc-framework-EventKit package.
 """
 
-import json as _json
 import logging
 import re
 import threading
@@ -39,7 +38,7 @@ class CalendarMatch:
     event_start: float = 0.0
     event_end: float = 0.0
     teams_join_url: str = ""
-    teams_conference_id: str = ""
+    teams_meeting_id: str = ""
 
 
 def _is_eventkit_available() -> bool:
@@ -63,9 +62,11 @@ def _extract_teams_thread_id(text: str) -> str | None:
 
 
 def _extract_teams_details(text: str) -> tuple[str, str]:
-    """Extract full Teams join URL and conference ID from text.
+    """Extract full Teams join URL and meeting thread ID from text.
 
-    Returns (join_url, conference_id). Both may be empty strings on failure.
+    Returns (join_url, meeting_id). Both may be empty strings on failure.
+    The meeting_id is the decoded thread ID which uniquely identifies the
+    Teams meeting (e.g. "19:meeting_ZmE2...@thread.v2").
     """
     if not text:
         return "", ""
@@ -73,14 +74,8 @@ def _extract_teams_details(text: str) -> tuple[str, str]:
     if not match:
         return "", ""
     join_url = match.group(0)
-    conference_id = ""
-    try:
-        context_raw = unquote(match.group(3))
-        context_data = _json.loads(context_raw)
-        conference_id = str(context_data.get("Tid", ""))
-    except (ValueError, AttributeError, KeyError):
-        pass
-    return join_url, conference_id
+    meeting_id = unquote(match.group(1))
+    return join_url, meeting_id
 
 
 def _score_time_match(event_start: float, event_end: float, meeting_start: float) -> float:
@@ -237,7 +232,7 @@ class CalendarMatcher:
             # Tier 1: Teams URL match
             teams_thread_id = None
             join_url = ""
-            conference_id = ""
+            meeting_id = ""
             for field_getter in [event.URL, event.notes, event.location]:
                 try:
                     field_value = field_getter()
@@ -250,7 +245,7 @@ class CalendarMatcher:
                         tid = _extract_teams_thread_id(text)
                         if tid:
                             teams_thread_id = tid
-                            join_url, conference_id = _extract_teams_details(text)
+                            join_url, meeting_id = _extract_teams_details(text)
                             break
                 except Exception:
                     continue
@@ -293,7 +288,7 @@ class CalendarMatcher:
                         event_start=event_start,
                         event_end=event_end,
                         teams_join_url=join_url,
-                        teams_conference_id=conference_id,
+                        teams_meeting_id=meeting_id,
                     )
                 )
             else:

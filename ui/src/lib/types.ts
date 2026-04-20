@@ -44,7 +44,7 @@ export interface Meeting {
   attendees_json: string;
   calendar_confidence: number;
   teams_join_url: string;
-  teams_conference_id: string;
+  teams_meeting_id: string;
 }
 
 export interface CalendarMeetingsResponse {

@@ -93,19 +93,31 @@ export function WeekTimeline({ currentDate, meetings }: WeekTimelineProps) {
                   const duration = meeting.duration_seconds
                     ? meeting.duration_seconds / 3600
                     : 0.5; // default 30min
-                  const top = Math.max(
-                    0,
-                    (startHour - START_HOUR) * HOUR_HEIGHT,
+                  // Clamp position within the visible range
+                  const clampedStart = Math.max(
+                    START_HOUR,
+                    Math.min(startHour, END_HOUR),
                   );
-                  const height = Math.max(20, duration * HOUR_HEIGHT);
+                  const clampedEnd = Math.min(END_HOUR, startHour + duration);
+                  const top = (clampedStart - START_HOUR) * HOUR_HEIGHT;
+                  const height = Math.max(
+                    20,
+                    (clampedEnd - clampedStart) * HOUR_HEIGHT,
+                  );
+                  const isOutOfRange =
+                    startHour < START_HOUR || startHour >= END_HOUR;
 
                   return (
                     <button
                       key={meeting.id}
                       onClick={() => navigate(`/meetings/${meeting.id}`)}
-                      className="absolute left-0.5 right-0.5 rounded px-1.5 py-0.5 bg-accent/20 border border-accent/30 hover:bg-accent/30 transition-colors overflow-hidden cursor-pointer"
+                      className={`absolute left-0.5 right-0.5 rounded px-1.5 py-0.5 border hover:bg-accent/30 transition-colors overflow-hidden cursor-pointer ${
+                        isOutOfRange
+                          ? "bg-amber-500/10 border-dashed border-amber-500/30"
+                          : "bg-accent/20 border-accent/30"
+                      }`}
                       style={{ top: `${top}px`, height: `${height}px` }}
-                      title={meeting.title || "Untitled"}
+                      title={`${meeting.title || "Untitled"}${isOutOfRange ? " (outside visible hours)" : ""}`}
                     >
                       <p className="text-[10px] font-medium text-text-primary truncate">
                         {meeting.title || "Untitled"}

@@ -688,9 +688,9 @@ export function MeetingDetail() {
                 <span className="px-1.5 py-0.5 rounded bg-blue-500/10 text-blue-400 text-[10px] font-medium">
                   Teams
                 </span>
-                {meeting.teams_conference_id && (
+                {meeting.teams_meeting_id && (
                   <span className="text-[10px] text-text-muted">
-                    Conference ID: {meeting.teams_conference_id}
+                    Meeting ID: {meeting.teams_meeting_id}
                   </span>
                 )}
               </div>

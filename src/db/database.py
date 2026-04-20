@@ -198,7 +198,7 @@ class Database:
             await _safe_add_column(self.conn, "meetings", "calendar_confidence", "REAL", "0.0")
             # Teams meeting identity columns (v8).
             await _safe_add_column(self.conn, "meetings", "teams_join_url", "TEXT", "''")
-            await _safe_add_column(self.conn, "meetings", "teams_conference_id", "TEXT", "''")
+            await _safe_add_column(self.conn, "meetings", "teams_meeting_id", "TEXT", "''")
             await self.conn.execute(f"PRAGMA user_version = {SCHEMA_VERSION}")
             await self.conn.commit()
             logger.info("Database schema created (version %d)", SCHEMA_VERSION)
@@ -268,7 +268,7 @@ class Database:
         if current_version < 8:
             # Teams meeting identity columns.
             await _safe_add_column(self.conn, "meetings", "teams_join_url", "TEXT", "''")
-            await _safe_add_column(self.conn, "meetings", "teams_conference_id", "TEXT", "''")
+            await _safe_add_column(self.conn, "meetings", "teams_meeting_id", "TEXT", "''")
             await self.conn.execute(f"PRAGMA user_version = {SCHEMA_VERSION}")
             await self.conn.commit()
             logger.info("Database migrated to version 8 (Teams identity columns)")

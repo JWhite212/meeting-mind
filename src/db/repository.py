@@ -35,7 +35,7 @@ _MUTABLE_COLUMNS = frozenset(
         "attendees_json",
         "calendar_confidence",
         "teams_join_url",
-        "teams_conference_id",
+        "teams_meeting_id",
         "updated_at",
     }
 )
@@ -64,7 +64,7 @@ class MeetingRecord:
     attendees_json: str = "[]"
     calendar_confidence: float = 0.0
     teams_join_url: str = ""
-    teams_conference_id: str = ""
+    teams_meeting_id: str = ""
 
     def to_dict(self) -> dict[str, Any]:
         return {
@@ -85,7 +85,7 @@ class MeetingRecord:
             "attendees_json": self.attendees_json,
             "calendar_confidence": self.calendar_confidence,
             "teams_join_url": self.teams_join_url,
-            "teams_conference_id": self.teams_conference_id,
+            "teams_meeting_id": self.teams_meeting_id,
             "created_at": self.created_at,
             "updated_at": self.updated_at,
         }
@@ -100,13 +100,13 @@ class MeetingRecord:
         attendees_json = "[]"
         calendar_confidence = 0.0
         teams_join_url = ""
-        teams_conference_id = ""
+        teams_meeting_id = ""
         try:
             calendar_event_title = row["calendar_event_title"] or ""
             attendees_json = row["attendees_json"] or "[]"
             calendar_confidence = row["calendar_confidence"] or 0.0
             teams_join_url = row["teams_join_url"] or ""
-            teams_conference_id = row["teams_conference_id"] or ""
+            teams_meeting_id = row["teams_meeting_id"] or ""
         except (IndexError, KeyError):
             pass
 
@@ -130,7 +130,7 @@ class MeetingRecord:
             attendees_json=attendees_json,
             calendar_confidence=calendar_confidence,
             teams_join_url=teams_join_url,
-            teams_conference_id=teams_conference_id,
+            teams_meeting_id=teams_meeting_id,
         )
 
 
