@@ -14,9 +14,12 @@ from fastapi import APIRouter, HTTPException
 from pydantic import BaseModel, ConfigDict
 
 from src.utils.config import (
+    ActionItemsConfig,
+    AnalyticsConfig,
     ApiConfig,
     AppConfig,
     AudioConfig,
+    CalendarConfig,
     DetectionConfig,
     DiarisationConfig,
     EmailChannelConfig,
@@ -24,7 +27,9 @@ from src.utils.config import (
     MarkdownConfig,
     NotificationsConfig,
     NotionConfig,
+    PrepConfig,
     RetentionConfig,
+    SeriesConfig,
     SummarisationConfig,
     TranscriptionConfig,
     WebhookChannelConfig,
@@ -74,8 +79,13 @@ def _full_config_dict(raw: dict) -> dict:
         notion=_build_dataclass(NotionConfig, raw.get("notion", {})),
         logging=_build_dataclass(LoggingConfig, raw.get("logging", {})),
         api=_build_dataclass(ApiConfig, raw.get("api", {})),
+        calendar=_build_dataclass(CalendarConfig, raw.get("calendar", {})),
         retention=_build_dataclass(RetentionConfig, raw.get("retention", {})),
+        action_items=_build_dataclass(ActionItemsConfig, raw.get("action_items", {})),
+        series=_build_dataclass(SeriesConfig, raw.get("series", {})),
+        analytics=_build_dataclass(AnalyticsConfig, raw.get("analytics", {})),
         notifications=_build_dataclass(NotificationsConfig, notif_base),
+        prep=_build_dataclass(PrepConfig, raw.get("prep", {})),
     )
     # Handle nested notification channel configs.
     webhook_raw = notif_raw.get("webhook", {})
@@ -148,6 +158,10 @@ class ConfigUpdateBody(BaseModel):
     calendar: dict | None = None
     retention: dict | None = None
     notifications: dict | None = None
+    action_items: dict | None = None
+    series: dict | None = None
+    analytics: dict | None = None
+    prep: dict | None = None
 
 
 @router.put("/api/config", summary="Update configuration")

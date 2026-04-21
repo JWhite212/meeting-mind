@@ -32,7 +32,7 @@ export function PrepBriefing() {
   // Loading skeleton
   if (isLoading) {
     return (
-      <div className="p-6 max-w-3xl mx-auto">
+      <div className="p-6 max-w-6xl mx-auto">
         <div className="h-6 w-48 bg-surface border border-border rounded animate-pulse mb-6" />
         <div className="space-y-3">
           <div className="h-4 w-full bg-surface border border-border rounded animate-pulse" />
@@ -48,7 +48,7 @@ export function PrepBriefing() {
   // Empty state
   if (!briefing) {
     return (
-      <div className="p-6 max-w-3xl mx-auto">
+      <div className="p-6 max-w-6xl mx-auto">
         <div className="flex flex-col items-center justify-center py-16 text-center">
           <p className="text-sm text-text-muted mb-4">
             No prep briefing available
@@ -69,7 +69,7 @@ export function PrepBriefing() {
 
   // Content
   return (
-    <div className="p-6 max-w-3xl mx-auto">
+    <div className="p-6 max-w-6xl mx-auto">
       <div className="prose prose-sm prose-invert max-w-none [&_h1]:text-base [&_h2]:text-sm [&_h2]:mt-4 [&_li]:text-text-secondary [&_p]:text-text-secondary">
         <Markdown>{briefing.content_markdown}</Markdown>
       </div>

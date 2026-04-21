@@ -14,9 +14,11 @@ import {
 import { useDaemonStatus } from "../../hooks/useDaemonStatus";
 import { useAppStore } from "../../stores/appStore";
 import { useTheme } from "../../hooks/useTheme";
+import { useAppearance } from "../../hooks/useAppearance";
 import { useToast } from "../common/Toast";
 import { Tooltip } from "../common/Tooltip";
 import type { Theme } from "../../hooks/useTheme";
+import type { FontSize, ContentDensity } from "../../hooks/useAppearance";
 import type { AppConfig, WhisperModel, SummaryTemplate } from "../../lib/types";
 
 /* ------------------------------------------------------------------ */
@@ -646,6 +648,12 @@ export function Settings() {
   const wsConnected = useAppStore((s) => s.wsConnected);
   const queryClient = useQueryClient();
   const { theme, setTheme: applyTheme } = useTheme();
+  const {
+    fontSize,
+    setFontSize: applyFontSize,
+    density,
+    setDensity: applyDensity,
+  } = useAppearance();
   const toast = useToast();
 
   const { data: fetchedConfig, isLoading: configLoading } = useQuery({
@@ -988,6 +996,34 @@ export function Settings() {
             <option value="system">System</option>
             <option value="light">Light</option>
             <option value="dark">Dark</option>
+          </select>
+        </Field>
+        <Field
+          label="Font size"
+          help="Adjust the base text size across the app"
+        >
+          <select
+            value={fontSize}
+            onChange={(e) => applyFontSize(e.target.value as FontSize)}
+            className={SELECT}
+          >
+            <option value="small">Small</option>
+            <option value="default">Default</option>
+            <option value="large">Large</option>
+            <option value="x-large">Extra Large</option>
+          </select>
+        </Field>
+        <Field
+          label="Content density"
+          help="Controls spacing and padding throughout the UI"
+        >
+          <select
+            value={density}
+            onChange={(e) => applyDensity(e.target.value as ContentDensity)}
+            className={SELECT}
+          >
+            <option value="comfortable">Comfortable</option>
+            <option value="compact">Compact</option>
           </select>
         </Field>
       </Section>

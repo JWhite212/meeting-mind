@@ -195,7 +195,14 @@ export async function exportMeeting(
     `${API_BASE}/api/export/${encodeURIComponent(id)}?format=${format}`,
     { method: "POST", headers },
   );
-  if (!res.ok) throw new Error(`Export failed: ${res.status}`);
+  if (!res.ok) {
+    let detail = `Export failed: ${res.status}`;
+    try {
+      const body = await res.json();
+      detail = body.detail || detail;
+    } catch {}
+    throw new Error(detail);
+  }
   return res.text();
 }
 

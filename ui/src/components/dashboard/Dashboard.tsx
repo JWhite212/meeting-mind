@@ -302,7 +302,7 @@ function PendingCallout() {
 
 export function Dashboard() {
   return (
-    <div className="flex flex-col gap-4 p-6 max-w-3xl">
+    <div className="flex flex-col gap-4 p-6 max-w-6xl">
       <h1 className="text-lg font-semibold text-text-primary">Dashboard</h1>
       <StatusCard />
       <StatsRow />

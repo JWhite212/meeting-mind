@@ -23,7 +23,7 @@ export function SeriesDetail() {
   // Loading skeleton
   if (isLoading) {
     return (
-      <div className="p-6 max-w-3xl mx-auto">
+      <div className="p-6 max-w-6xl mx-auto">
         <div className="h-7 w-64 bg-surface border border-border rounded animate-pulse mb-2" />
         <div className="h-4 w-48 bg-surface border border-border rounded animate-pulse mb-8" />
         <div className="h-32 bg-surface border border-border rounded animate-pulse mb-6" />
@@ -42,7 +42,7 @@ export function SeriesDetail() {
   // Empty state
   if (!series) {
     return (
-      <div className="p-6 max-w-3xl mx-auto">
+      <div className="p-6 max-w-6xl mx-auto">
         <p className="text-sm text-text-muted text-center py-16">
           Series not found.
         </p>
@@ -55,7 +55,7 @@ export function SeriesDetail() {
   const maxDuration = Math.max(...durationTrend, 1);
 
   return (
-    <div className="p-6 max-w-3xl mx-auto">
+    <div className="p-6 max-w-6xl mx-auto">
       {/* Header */}
       <h1 className="text-2xl font-bold text-text-primary">{series.title}</h1>
       <p className="text-xs text-text-muted mt-1">

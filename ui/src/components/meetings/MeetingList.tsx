@@ -97,7 +97,7 @@ export function MeetingList() {
   const totalPages = Math.ceil(total / PAGE_SIZE);
 
   return (
-    <div className="flex flex-col gap-4 p-6 max-w-3xl">
+    <div className="flex flex-col gap-4 p-6 max-w-6xl">
       <h1 className="text-lg font-semibold text-text-primary">Meetings</h1>
 
       {!daemonRunning ? (

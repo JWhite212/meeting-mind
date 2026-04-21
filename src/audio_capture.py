@@ -190,10 +190,12 @@ class AudioCapture:
                 mic_channels = min(mic_info["max_input_channels"], 2)
 
             # Open streams.
+            system_info = sd.query_devices(self._blackhole_idx)
+            system_channels = min(int(system_info["max_input_channels"]), 2)
             system_stream = sd.InputStream(
                 device=self._blackhole_idx,
                 samplerate=self._config.sample_rate,
-                channels=2,  # BlackHole 2ch always provides stereo.
+                channels=system_channels,
                 dtype="float32",
                 callback=system_callback,
                 blocksize=1024,
@@ -452,6 +454,19 @@ class AudioCapture:
             if self._recording:
                 logger.warning("Already recording — ignoring start().")
                 return
+
+            # Log available input devices for diagnostics.
+            all_devices = sd.query_devices()
+            input_devices = [
+                f"  [{i}] {d['name']}"
+                for i, d in enumerate(all_devices)
+                if d["max_input_channels"] > 0
+            ]
+            logger.info(
+                "Available input devices (%d):\n%s",
+                len(input_devices),
+                "\n".join(input_devices) if input_devices else "  (none found)",
+            )
 
             self._blackhole_idx = self._find_device(
                 self._config.blackhole_device_name, kind="BlackHole"

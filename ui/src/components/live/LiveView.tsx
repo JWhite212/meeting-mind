@@ -110,7 +110,7 @@ export function LiveView() {
   });
 
   return (
-    <div className="flex flex-col gap-6 p-6 max-w-3xl">
+    <div className="flex flex-col gap-6 p-6 max-w-6xl">
       <h1 className="text-lg font-semibold text-text-primary">Live</h1>
 
       {/* Status + timer */}

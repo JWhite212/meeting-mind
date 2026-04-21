@@ -536,7 +536,7 @@ export function MeetingDetail() {
 
   if (isError) {
     return (
-      <div className="p-6 max-w-3xl">
+      <div className="p-6 max-w-6xl">
         <ErrorState
           message="Failed to load meeting."
           onRetry={() => refetch()}
@@ -547,7 +547,7 @@ export function MeetingDetail() {
 
   if (!meeting) {
     return (
-      <div className="p-6 max-w-3xl">
+      <div className="p-6 max-w-6xl">
         <EmptyState
           title="Meeting not found"
           description="This meeting may have been deleted."
@@ -569,7 +569,7 @@ export function MeetingDetail() {
   const hasAudio = !!meeting.audio_path;
 
   return (
-    <div className="flex flex-col gap-4 p-6 max-w-3xl">
+    <div className="flex flex-col gap-4 p-6 max-w-6xl">
       {/* Back button */}
       <button
         onClick={() => navigate("/meetings")}
@@ -860,8 +860,12 @@ export function MeetingDetail() {
                     a.click();
                     URL.revokeObjectURL(url);
                     toast.success("Exported as Markdown.");
-                  } catch {
-                    toast.error("Failed to export Markdown.");
+                  } catch (err) {
+                    toast.error(
+                      err instanceof Error
+                        ? err.message
+                        : "Failed to export Markdown.",
+                    );
                   }
                 }}
                 role="menuitem"
@@ -882,8 +886,12 @@ export function MeetingDetail() {
                     a.click();
                     URL.revokeObjectURL(url);
                     toast.success("Exported as JSON.");
-                  } catch {
-                    toast.error("Failed to export JSON.");
+                  } catch (err) {
+                    toast.error(
+                      err instanceof Error
+                        ? err.message
+                        : "Failed to export JSON.",
+                    );
                   }
                 }}
                 role="menuitem"
@@ -946,9 +954,9 @@ export function MeetingDetail() {
             )}
           </div>
 
-          <div className="rounded-xl bg-surface-raised border border-border p-6 max-h-[60vh] overflow-y-auto">
+          <div className="rounded-xl bg-surface-raised border border-border p-6">
             {activeTab === "summary" && hasSummary ? (
-              <div className="prose prose-sm prose-invert max-w-none text-text-primary [&_h1]:text-text-primary [&_h2]:text-text-primary [&_h3]:text-text-primary [&_li]:text-text-primary [&_p]:text-text-secondary [&_strong]:text-text-primary">
+              <div className="prose prose-invert max-w-none text-text-primary [&_h1]:text-text-primary [&_h2]:text-text-primary [&_h3]:text-text-primary [&_li]:text-text-primary [&_p]:text-text-secondary [&_strong]:text-text-primary">
                 <Markdown
                   rehypePlugins={[
                     [
