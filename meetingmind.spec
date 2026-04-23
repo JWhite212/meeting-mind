@@ -64,20 +64,8 @@ a = Analysis(
         # MLX Whisper (Apple Silicon GPU transcription)
         "mlx",
         "mlx_whisper",
-        # API server
-        "uvicorn",
-        "uvicorn.logging",
-        "uvicorn.loops",
-        "uvicorn.loops.auto",
-        "uvicorn.protocols",
-        "uvicorn.protocols.http",
-        "uvicorn.protocols.http.auto",
-        "uvicorn.protocols.websockets",
-        "uvicorn.protocols.websockets.auto",
-        "uvicorn.lifespan",
-        "uvicorn.lifespan.on",
+        # API server (uvicorn/starlette submodules collected below)
         "fastapi",
-        "starlette",
         "websockets",
         "aiosqlite",
         "pydantic",
@@ -174,6 +162,22 @@ a = Analysis(
         "ruff",
         "pip",
         "setuptools",
+        # sentence-transformers and its heavy dependencies are optional
+        # (semantic search degrades gracefully — see src/embeddings.py)
+        # NOTE: scipy is kept — mlx_whisper.timing requires scipy.signal
+        "torch",
+        "torchvision",
+        "torchaudio",
+        "sentence_transformers",
+        "transformers",
+        "sklearn",
+        "scikit-learn",
+        # Other unused packages
+        "PIL",
+        "cv2",
+        "IPython",
+        "notebook",
+        "sphinx",
     ],
     win_no_prefer_redirects=False,
     win_private_assemblies=False,
@@ -191,7 +195,7 @@ exe = EXE(
     name="meetingmind-daemon",
     debug=False,
     bootloader_ignore_signals=False,
-    strip=False,
+    strip=True,
     upx=False,
     console=True,
     target_arch="arm64",
@@ -202,7 +206,7 @@ coll = COLLECT(
     a.binaries,
     a.zipfiles,
     a.datas,
-    strip=False,
+    strip=True,
     upx=False,
     name="meetingmind-daemon",
 )

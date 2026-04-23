@@ -8,8 +8,10 @@
 #   make test        — Run the Python test suite
 #   make lint        — Run ruff linter on src/ and tests/
 #   make clean       — Remove all build artefacts
+#   make clean-all   — Deep clean (also removes venv, node_modules, Rust cache)
+#   make size        — Show disk usage breakdown by component
 
-.PHONY: setup build-daemon copy-daemon build-app build install dev test lint clean
+.PHONY: setup build-daemon copy-daemon build-app build install dev test lint clean clean-all size
 
 setup:
 	@echo "==> Creating virtual environment (if missing)"
@@ -47,5 +49,25 @@ lint:
 clean:
 	@echo "==> Cleaning build artefacts"
 	rm -rf dist/
+	rm -rf build/
 	rm -rf ui/dist/
+	rm -rf ui/src-tauri/resources/meetingmind-daemon/
 	rm -rf ui/src-tauri/target/release/bundle/
+
+clean-all: clean
+	@echo "==> Deep clean (venv, node_modules, Rust cache)"
+	rm -rf .venv/
+	rm -rf ui/node_modules/
+	rm -rf ui/src-tauri/target/
+
+size:
+	@echo "==> Project disk usage"
+	@du -sh . 2>/dev/null || true
+	@echo ""
+	@echo "--- Breakdown ---"
+	@du -sh .venv/ 2>/dev/null            || echo "  .venv/                  (not present)"
+	@du -sh ui/node_modules/ 2>/dev/null   || echo "  ui/node_modules/        (not present)"
+	@du -sh ui/src-tauri/target/ 2>/dev/null || echo "  ui/src-tauri/target/    (not present)"
+	@du -sh dist/ 2>/dev/null              || echo "  dist/                   (not present)"
+	@du -sh build/ 2>/dev/null             || echo "  build/                  (not present)"
+	@du -sh ui/src-tauri/resources/meetingmind-daemon/ 2>/dev/null || echo "  ui/.../meetingmind-daemon/ (not present)"

@@ -17,6 +17,7 @@ pyyaml>=6.0.1
 
 # Utilities
 python-slugify>=8.0.0
+tenacity>=8.0
 
 # API server
 fastapi>=0.115.0
@@ -30,8 +31,10 @@ sqlite-vec>=0.1.6
 # Calendar integration (macOS EventKit — skipped on non-macOS platforms)
 pyobjc-framework-EventKit>=10.0; sys_platform == "darwin"
 
-# Semantic search (optional — vector search disabled without it)
-sentence-transformers>=2.2.0
+# Semantic search — optional, install separately if needed:
+#   pip install sentence-transformers>=2.2.0
+# Pulls in torch (~400MB), scipy, scikit-learn. The app works without it;
+# is_embeddings_available() guards all usage in src/embeddings.py.
 
 # ML-based speaker diarisation (optional — energy-based diarisation works without it)
 # pyannote.audio>=3.1
