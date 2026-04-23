@@ -1,4 +1,4 @@
-import { useState, useEffect, useMemo, useCallback, useRef } from "react";
+import { useState, useEffect, useCallback, useRef } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { useBlocker } from "react-router-dom";
 import { invoke } from "@tauri-apps/api/core";
@@ -664,6 +664,7 @@ export function Settings() {
 
   const [form, setForm] = useState<AppConfig | null>(null);
   const [savedConfig, setSavedConfig] = useState<AppConfig | null>(null);
+  const [isDirty, setIsDirty] = useState(false);
   const [showRestart, setShowRestart] = useState(false);
   const [showSecrets, setShowSecrets] = useState<Record<string, boolean>>({});
 
@@ -683,6 +684,7 @@ export function Settings() {
     if (fetchedConfig && !form) {
       setForm(fetchedConfig);
       setSavedConfig(fetchedConfig);
+      setIsDirty(false);
     }
   }, [fetchedConfig, form]);
 
@@ -692,6 +694,7 @@ export function Settings() {
       queryClient.setQueryData(["config"], data);
       setForm(data);
       setSavedConfig(data);
+      setIsDirty(false);
       setShowRestart(true);
       toast.success("Settings saved successfully.");
     },
@@ -702,16 +705,11 @@ export function Settings() {
     },
   });
 
-  const isDirty = useMemo(
-    () =>
-      form !== null &&
-      savedConfig !== null &&
-      JSON.stringify(form) !== JSON.stringify(savedConfig),
-    [form, savedConfig],
-  );
-
   const discardChanges = useCallback(() => {
-    if (savedConfig) setForm(savedConfig);
+    if (savedConfig) {
+      setForm(savedConfig);
+      setIsDirty(false);
+    }
   }, [savedConfig]);
 
   // Block navigation when there are unsaved changes.
@@ -728,6 +726,7 @@ export function Settings() {
         [section]: { ...prev[section], [key]: value },
       };
     });
+    setIsDirty(true);
   }
 
   function setNotionProp(key: string, value: string) {
@@ -741,6 +740,7 @@ export function Settings() {
         },
       };
     });
+    setIsDirty(true);
   }
 
   function setWebhookProp<
@@ -756,6 +756,7 @@ export function Settings() {
         },
       };
     });
+    setIsDirty(true);
   }
 
   function setEmailProp<K extends keyof AppConfig["notifications"]["email"]>(
@@ -772,6 +773,7 @@ export function Settings() {
         },
       };
     });
+    setIsDirty(true);
   }
 
   const toggleSecret = (key: string) =>

@@ -69,16 +69,20 @@ class ApiServer:
         self._stop_recording = None
         self._stop_recording_deferred = None
         self._is_recording = None
+        self._is_stopping = None
 
     def set_state_accessors(self, get_daemon_state, get_active_meeting) -> None:
         self._get_daemon_state = get_daemon_state
         self._get_active_meeting = get_active_meeting
 
-    def set_recording_controls(self, start, stop, stop_deferred, is_recording) -> None:
+    def set_recording_controls(
+        self, start, stop, stop_deferred, is_recording, is_stopping=None
+    ) -> None:
         self._start_recording = start
         self._stop_recording = stop
         self._stop_recording_deferred = stop_deferred
         self._is_recording = is_recording
+        self._is_stopping = is_stopping
 
     def _create_app(self) -> FastAPI:
         app = FastAPI(
@@ -117,6 +121,7 @@ class ApiServer:
             self._stop_recording,
             self._stop_recording_deferred,
             self._is_recording,
+            self._is_stopping,
         )
 
         calendar_routes.init(self.repo)

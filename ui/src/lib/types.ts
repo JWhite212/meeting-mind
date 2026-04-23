@@ -323,7 +323,8 @@ export type WSEvent =
       body: string;
       reference_id: string | null;
     }
-  | { type: "action_items.extracted"; meeting_id: string; count: number };
+  | { type: "action_items.extracted"; meeting_id: string; count: number }
+  | { type: "audio.mic_unavailable" };
 
 /** Action item types. */
 export type ActionItemStatus = "open" | "in_progress" | "done" | "cancelled";

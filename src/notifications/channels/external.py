@@ -7,10 +7,26 @@ from email.mime.multipart import MIMEMultipart
 from email.mime.text import MIMEText
 
 import httpx
+from tenacity import retry, retry_if_exception_type, stop_after_attempt, wait_exponential
 
 from src.utils.config import EmailChannelConfig, WebhookChannelConfig
 
 logger = logging.getLogger("meetingmind.notifications.external")
+
+
+@retry(
+    stop=stop_after_attempt(3),
+    wait=wait_exponential(multiplier=1, min=1, max=10),
+    retry=retry_if_exception_type(
+        (httpx.HTTPStatusError, httpx.ConnectError, httpx.TimeoutException)
+    ),
+)
+async def _do_webhook_post(url: str, payload: dict) -> int:
+    """Perform the HTTP POST to the webhook URL. Raises on failure."""
+    async with httpx.AsyncClient(timeout=10) as client:
+        resp = await client.post(url, json=payload)
+        resp.raise_for_status()
+    return resp.status_code
 
 
 async def send_webhook(
@@ -35,10 +51,8 @@ async def send_webhook(
         payload = {"title": title, "body": body, "type": type}
 
     try:
-        async with httpx.AsyncClient(timeout=10) as client:
-            resp = await client.post(config.url, json=payload)
-            resp.raise_for_status()
-        logger.debug("Webhook sent to %s (status %s)", config.url, resp.status_code)
+        status_code = await _do_webhook_post(config.url, payload)
+        logger.debug("Webhook sent to %s (status %s)", config.url, status_code)
         return True
     except Exception as e:
         logger.warning("Webhook delivery failed: %s", e)
@@ -65,6 +79,11 @@ async def send_email(
         return False
 
 
+@retry(
+    stop=stop_after_attempt(3),
+    wait=wait_exponential(multiplier=1, min=1, max=10),
+    retry=retry_if_exception_type((smtplib.SMTPException, OSError, ConnectionError)),
+)
 def _send_email_sync(config: EmailChannelConfig, title: str, body: str) -> None:
     """Blocking SMTP send — runs in executor."""
     msg = MIMEMultipart("alternative")

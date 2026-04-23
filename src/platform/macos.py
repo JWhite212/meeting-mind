@@ -7,6 +7,7 @@ rest of the audio pipeline are macOS-bound.
 """
 
 import logging
+import shutil
 import subprocess
 
 logger = logging.getLogger(__name__)
@@ -94,12 +95,12 @@ class MacOSDetector:
         script = (  # noqa: E501
             'tell application "System Events"\n'
             '    set teamsList to every process whose name contains "Teams"\n'
-            '    repeat with teamsProc in teamsList\n'
-            '        set winNames to name of every window of teamsProc\n'
-            '        repeat with winName in winNames\n'
+            "    repeat with teamsProc in teamsList\n"
+            "        set winNames to name of every window of teamsProc\n"
+            "        repeat with winName in winNames\n"
             '            set lower to do shell script "echo "'
-            ' & quoted form of (winName as text)'
-            ' & " | tr \'[:upper:]\' \'[:lower:]\'"\n'
+            " & quoted form of (winName as text)"
+            " & \" | tr '[:upper:]' '[:lower:]'\"\n"
             '            if lower contains "meeting"'
             ' or lower contains "call with"'
             ' or lower contains "in call" then\n'
@@ -120,3 +121,8 @@ class MacOSDetector:
             return result.stdout.strip().lower() == "true"
         except (subprocess.TimeoutExpired, FileNotFoundError):
             return False
+
+    def verify(self) -> list[str]:
+        """Return names of any required subprocess tools not found on PATH."""
+        tools = ["pgrep", "lsof", "osascript"]
+        return [t for t in tools if shutil.which(t) is None]

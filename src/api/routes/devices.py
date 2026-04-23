@@ -13,16 +13,18 @@ router = APIRouter()
 
 
 @router.get("/api/devices", response_model=DeviceListResponse, summary="List audio devices")
-async def list_devices():
+async def list_devices() -> dict:
     devices = sd.query_devices()
     inputs = []
     for i, dev in enumerate(devices):
         if dev["max_input_channels"] > 0:
-            inputs.append({
-                "index": i,
-                "name": dev["name"],
-                "channels": dev["max_input_channels"],
-                "sample_rate": dev["default_samplerate"],
-                "is_default": i == sd.default.device[0],
-            })
+            inputs.append(
+                {
+                    "index": i,
+                    "name": dev["name"],
+                    "channels": dev["max_input_channels"],
+                    "sample_rate": dev["default_samplerate"],
+                    "is_default": i == sd.default.device[0],
+                }
+            )
     return {"devices": inputs}

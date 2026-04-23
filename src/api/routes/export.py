@@ -92,7 +92,7 @@ async def export_meeting(
                 pass
 
         content = "\n".join(parts)
-    except Exception as e:
+    except (ValueError, OSError) as e:
         logger.exception("Markdown export failed for meeting %s", meeting_id)
         raise HTTPException(status_code=500, detail=f"Markdown generation failed: {e}")
     safe_id = re.sub(r"[^a-zA-Z0-9_-]", "_", meeting_id)

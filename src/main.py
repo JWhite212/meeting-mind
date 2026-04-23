@@ -82,6 +82,7 @@ class MeetingMind:
 
         self._meeting_started_at: float = 0.0
         self._active_meeting_id: str | None = None
+        self._stopping: bool = False
 
         # Background processing executor for non-blocking pipeline runs.
         self._processing_executor = concurrent.futures.ThreadPoolExecutor(
@@ -254,10 +255,7 @@ class MeetingMind:
             "meeting.ended",
             duration=event.duration_seconds,
         )
-        try:
-            audio_path = self._capture.stop(blocking=False)
-        except TypeError:
-            audio_path = self._capture.stop()
+        audio_path = self._capture.stop(blocking=False)
 
         if audio_path is None or not audio_path.exists():
             logger.error("No audio file produced. Skipping processing.")
@@ -696,29 +694,43 @@ class MeetingMind:
 
         self._capture.on_audio_level = _on_level
 
+        self._meeting_started_at = time.time()
         try:
             self._capture.start()
         except Exception:
+            self._meeting_started_at = 0.0
             logger.error("API recording start failed", exc_info=True)
             self._emit("pipeline.error", stage="capture", error="Failed to start audio capture")
             raise
-        self._meeting_started_at = time.time()
+
+        # Notify UI about mic availability.
+        if not self._capture.mic_available:
+            self._emit("audio.mic_unavailable")
+
         self._emit("meeting.started", started_at=self._meeting_started_at)
+
+    @property
+    def is_stopping(self) -> bool:
+        return self._stopping
 
     def api_stop_recording(self) -> None:
         """Stop a manual recording and trigger background processing."""
+        self._stopping = True
         started_at = self._meeting_started_at
         self._emit("meeting.ended", duration=time.time() - started_at)
-        audio_path = self._capture.stop()
+        try:
+            audio_path = self._capture.stop()
 
-        if audio_path and audio_path.exists():
-            duration = time.time() - started_at
-            self._processing_executor.submit(
-                self._process_audio,
-                audio_path,
-                started_at,
-                duration,
-            )
+            if audio_path and audio_path.exists():
+                duration = time.time() - started_at
+                self._processing_executor.submit(
+                    self._process_audio,
+                    audio_path,
+                    started_at,
+                    duration,
+                )
+        finally:
+            self._stopping = False
 
     def api_stop_recording_deferred(self) -> str:
         """Stop a manual recording but defer processing.
@@ -728,18 +740,27 @@ class MeetingMind:
 
         Returns the meeting ID.
         """
+        self._stopping = True
         started_at = self._meeting_started_at
         duration = time.time() - started_at
         self._emit("meeting.ended", duration=duration)
-        audio_path = self._capture.stop()
+        try:
+            audio_path = self._capture.stop()
 
-        if not audio_path or not audio_path.exists():
-            raise AudioCaptureError("No audio file produced")
+            # Wait for audio merge to complete before persisting.
+            self._capture.wait_for_merge(timeout=120)
 
-        _, meeting_id = self._persist_audio(audio_path, started_at, status="pending")
-        if meeting_id:
-            self._db_update(meeting_id, duration_seconds=duration, ended_at=started_at + duration)
-        return meeting_id or ""
+            if not audio_path or not audio_path.exists():
+                raise AudioCaptureError("No audio file produced")
+
+            _, meeting_id = self._persist_audio(audio_path, started_at, status="pending")
+            if meeting_id:
+                self._db_update(
+                    meeting_id, duration_seconds=duration, ended_at=started_at + duration
+                )
+            return meeting_id or ""
+        finally:
+            self._stopping = False
 
     # ------------------------------------------------------------------
     # Run modes
@@ -768,6 +789,7 @@ class MeetingMind:
             stop=self.api_stop_recording,
             stop_deferred=self.api_stop_recording_deferred,
             is_recording=lambda: self._capture.is_recording,
+            is_stopping=lambda: self._stopping,
         )
         self._api_server.start()
 

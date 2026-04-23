@@ -57,8 +57,10 @@ def test_error_isolation():
 def test_unsubscribe_sync():
     bus = EventBus()
     received = []
+
     def cb(e):
         received.append(e)
+
     bus.subscribe_sync(cb)
     bus.emit({"type": "first"})
     bus.unsubscribe_sync(cb)
@@ -73,15 +75,16 @@ async def test_async_callback():
     bus.set_loop(loop)
 
     received = []
+    done = asyncio.Event()
 
     async def handler(event):
         received.append(event)
+        done.set()
 
     bus.subscribe_async(handler)
     bus.emit({"type": "async.test"})
 
-    # Give the coroutine time to be scheduled and run.
-    await asyncio.sleep(0.1)
+    await asyncio.wait_for(done.wait(), timeout=2.0)
     assert len(received) == 1
     assert received[0]["type"] == "async.test"
 
@@ -93,16 +96,19 @@ async def test_unsubscribe_async():
     bus.set_loop(loop)
 
     received = []
+    done = asyncio.Event()
 
     async def handler(event):
         received.append(event)
+        done.set()
 
     bus.subscribe_async(handler)
     bus.emit({"type": "first"})
-    await asyncio.sleep(0.1)
+    await asyncio.wait_for(done.wait(), timeout=2.0)
     bus.unsubscribe_async(handler)
     bus.emit({"type": "second"})
-    await asyncio.sleep(0.1)
+    # Yield to event loop to ensure no more callbacks fire.
+    await asyncio.sleep(0)
     assert len(received) == 1
 
 

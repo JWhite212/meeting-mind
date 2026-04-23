@@ -48,6 +48,7 @@ export function useWebSocket(onEvent: (event: WSEvent) => void) {
         );
         const jitter = Math.random() * 1000;
         attemptRef.current++;
+        clearTimeout(reconnectTimer.current);
         reconnectTimer.current = setTimeout(connect, delay + jitter);
       };
 
@@ -63,6 +64,7 @@ export function useWebSocket(onEvent: (event: WSEvent) => void) {
       );
       const jitter = Math.random() * 1000;
       attemptRef.current++;
+      clearTimeout(reconnectTimer.current);
       reconnectTimer.current = setTimeout(connect, delay + jitter);
     }
   }, []);

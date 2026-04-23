@@ -36,7 +36,7 @@ def test_load_valid_config(tmp_path: Path):
 def test_load_missing_file_returns_defaults():
     config = load_config(Path("/nonexistent/config.yaml"))
     assert isinstance(config, AppConfig)
-    assert config.detection.poll_interval_seconds == 3
+    assert config.detection.poll_interval_seconds == 2
     assert config.audio.mic_enabled is True
     assert config.transcription.model_size == "mlx-community/whisper-large-v3-turbo"
 
@@ -83,4 +83,4 @@ def test_load_empty_yaml(tmp_path: Path):
     config_file.write_text("")
     config = load_config(config_file)
     assert isinstance(config, AppConfig)
-    assert config.detection.poll_interval_seconds == 3
+    assert config.detection.poll_interval_seconds == 2

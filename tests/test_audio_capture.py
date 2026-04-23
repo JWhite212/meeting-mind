@@ -114,7 +114,7 @@ class TestAudioCaptureStartStop:
 
 
 class TestAudioCaptureMerge:
-    """Tests for _to_mono(), _normalise_rms(), _rms_dbfs(), and _merge_sources()."""
+    """Tests for _to_mono() and _merge_sources()."""
 
     @pytest.fixture
     def capture(self, tmp_path) -> AudioCapture:
@@ -135,35 +135,6 @@ class TestAudioCaptureMerge:
         assert mono.ndim == 1
         expected = np.mean(data, axis=1)
         np.testing.assert_array_almost_equal(mono, expected)
-
-    def test_normalise_rms_silent_passthrough(self):
-        audio = np.zeros(1000, dtype=np.float32)
-        result = AudioCapture._normalise_rms(audio)
-        # Silent audio should pass through unchanged.
-        assert np.all(result == 0.0)
-
-    def test_normalise_rms_scales_correctly(self):
-        # Create a signal with known RMS.
-        rms_in = 0.5
-        audio = np.full(1000, rms_in, dtype=np.float32)
-
-        target_dbfs = -20.0
-        AudioCapture._normalise_rms(audio, target_dbfs=target_dbfs)
-
-        # After normalisation, RMS should be at the target level.
-        target_rms = 10.0 ** (target_dbfs / 20.0)
-        actual_rms = np.sqrt(np.mean(audio**2))
-        np.testing.assert_almost_equal(actual_rms, target_rms, decimal=4)
-
-    def test_rms_dbfs_silent_floor(self):
-        audio = np.zeros(100, dtype=np.float32)
-        assert AudioCapture._rms_dbfs(audio) == -100.0
-
-    def test_rms_dbfs_known_value(self):
-        # Full-scale signal (all 1.0) has RMS of 1.0, so dBFS should be 0.
-        audio = np.ones(1000, dtype=np.float32)
-        dbfs = AudioCapture._rms_dbfs(audio)
-        np.testing.assert_almost_equal(dbfs, 0.0, decimal=2)
 
     def test_volume_clamping(self, tmp_path):
         """Verify system_volume and mic_volume are clamped to [0, 2]."""
@@ -276,11 +247,6 @@ class TestAudioCaptureEdgeCases:
         assert len(output_audio) == 16000
         # Output should be normalised (not silent).
         assert np.max(np.abs(output_audio)) > 0.0
-
-    def test_rms_dbfs_near_zero_floor(self):
-        """RMS below 1e-10 should be floored to -100.0 dBFS."""
-        audio = np.array([1e-11, -1e-11], dtype=np.float64)
-        assert AudioCapture._rms_dbfs(audio) == -100.0
 
 
 # ---------------------------------------------------------------------------

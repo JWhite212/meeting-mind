@@ -126,12 +126,15 @@ class TeamsDetector:
                     self._state = MeetingState.ACTIVE
                     self._consecutive_detections = 0
                     logger.info("Meeting confirmed — recording started.")
-                    self.on_meeting_start(
-                        MeetingEvent(
-                            state=MeetingState.ACTIVE,
-                            started_at=self._meeting_started_at,
+                    try:
+                        self.on_meeting_start(
+                            MeetingEvent(
+                                state=MeetingState.ACTIVE,
+                                started_at=self._meeting_started_at,
+                            )
                         )
-                    )
+                    except Exception:
+                        logger.error("on_meeting_start callback failed", exc_info=True)
                 else:
                     logger.debug(
                         f"Possible meeting ({self._consecutive_detections}/"
@@ -159,14 +162,17 @@ class TeamsDetector:
                         )
                     else:
                         logger.info(f"Meeting ended after {duration:.0f}s — processing.")
-                        self.on_meeting_end(
-                            MeetingEvent(
-                                state=MeetingState.ENDING,
-                                started_at=self._meeting_started_at,
-                                ended_at=ended_at,
-                                duration_seconds=duration,
+                        try:
+                            self.on_meeting_end(
+                                MeetingEvent(
+                                    state=MeetingState.ENDING,
+                                    started_at=self._meeting_started_at,
+                                    ended_at=ended_at,
+                                    duration_seconds=duration,
+                                )
                             )
-                        )
+                        except Exception:
+                            logger.error("on_meeting_end callback failed", exc_info=True)
 
                     self._state = MeetingState.IDLE
                     self._cooldown_until = time.time() + self._config.min_gap_before_new_meeting
@@ -190,6 +196,16 @@ class TeamsDetector:
         dedicated thread. Use stop() to signal exit.
         """
         self._stop_event.clear()
+
+        # Check that platform tools are available before entering the loop.
+        if hasattr(self._platform, "verify"):
+            missing = self._platform.verify()
+            if missing:
+                logger.warning(
+                    "Platform tools not found: %s — detection may not work.",
+                    ", ".join(missing),
+                )
+
         logger.info(
             "Detector started. Polling every %ds.",
             self._config.poll_interval_seconds,

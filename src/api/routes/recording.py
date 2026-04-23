@@ -12,6 +12,7 @@ import time
 from fastapi import APIRouter, HTTPException
 
 from src.api.schemas import RecordStartResponse, RecordStopResponse
+from src.audio_capture import AudioCaptureError
 
 logger = logging.getLogger("meetingmind.api.recording")
 
@@ -21,15 +22,17 @@ _start_recording = None
 _stop_recording = None
 _stop_recording_deferred = None
 _is_recording = None
+_is_stopping = None
 
 
-def init(start_recording, stop_recording, stop_deferred, is_recording) -> None:
+def init(start_recording, stop_recording, stop_deferred, is_recording, is_stopping=None) -> None:
     """Inject recording control callbacks from the orchestrator."""
-    global _start_recording, _stop_recording, _stop_recording_deferred, _is_recording
+    global _start_recording, _stop_recording, _stop_recording_deferred, _is_recording, _is_stopping
     _start_recording = start_recording
     _stop_recording = stop_recording
     _stop_recording_deferred = stop_deferred
     _is_recording = is_recording
+    _is_stopping = is_stopping
 
 
 @router.post("/api/record/start", response_model=RecordStartResponse, summary="Start recording")
@@ -40,9 +43,12 @@ async def start_recording():
     if _is_recording():
         raise HTTPException(status_code=409, detail="Already recording")
 
+    if _is_stopping and _is_stopping():
+        raise HTTPException(status_code=409, detail="Recording is still stopping")
+
     try:
         _start_recording()
-    except Exception as e:
+    except (AudioCaptureError, OSError) as e:
         logger.error("Failed to start recording: %s", e)
         raise HTTPException(status_code=500, detail="Failed to start recording. Check daemon logs.")
 
@@ -64,7 +70,7 @@ async def stop_recording(defer: bool = False):
         # Stop recording and save audio without processing.
         try:
             meeting_id = _stop_recording_deferred()
-        except Exception as e:
+        except (AudioCaptureError, OSError) as e:
             logger.error("Failed to defer recording: %s", e)
             raise HTTPException(
                 status_code=500,

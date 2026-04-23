@@ -62,6 +62,7 @@ export function LiveView() {
   const pipelineStage = useAppStore((s) => s.pipelineStage);
   const liveSegments = useAppStore((s) => s.liveSegments);
   const audioLevels = useAppStore((s) => s.audioLevels);
+  const micUnavailable = useAppStore((s) => s.micUnavailable);
   const queryClient = useQueryClient();
   const segmentsEndRef = useRef<HTMLDivElement>(null);
 
@@ -82,6 +83,13 @@ export function LiveView() {
   }, [liveSegments.length]);
 
   const toast = useToast();
+
+  // Notify user if microphone was unavailable at recording start.
+  useEffect(() => {
+    if (micUnavailable && isRecording) {
+      toast.warning("Microphone not found. Recording system audio only.");
+    }
+  }, [micUnavailable, isRecording]);
 
   const startMutation = useMutation({
     mutationFn: startRecording,

@@ -51,7 +51,7 @@ def fake_platform() -> FakePlatform:
 def detection_config() -> DetectionConfig:
     """DetectionConfig with fast values for testing."""
     return DetectionConfig(
-        poll_interval_seconds=0,
+        poll_interval_seconds=1,
         min_meeting_duration_seconds=10,
         required_consecutive_detections=2,
         required_consecutive_end_detections=2,

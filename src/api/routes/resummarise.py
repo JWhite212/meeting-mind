@@ -106,7 +106,7 @@ async def resummarise_meeting(meeting_id: str, template_name: str | None = None)
     try:
         summariser = Summariser(config)
         summary = await asyncio.to_thread(summariser.summarise, transcript, template)
-    except Exception as e:
+    except (ValueError, RuntimeError, FileNotFoundError) as e:
         logger.error("Re-summarisation failed: %s", e, exc_info=True)
         await _repo.update_meeting(meeting_id, status="error")
         if _event_bus:

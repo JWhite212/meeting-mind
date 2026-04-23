@@ -26,6 +26,10 @@ class PlatformDetector(Protocol):
         """Fallback heuristic: check window titles for call indicators."""
         ...
 
+    def verify(self) -> list[str]:
+        """Return names of any required subprocess tools not found on PATH."""
+        ...
+
 
 def create_detector() -> PlatformDetector:
     """Return the appropriate PlatformDetector for the current OS."""

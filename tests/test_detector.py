@@ -336,7 +336,7 @@ class TestDetectorRunLoop:
         detector.run()
         assert detector.state == MeetingState.IDLE
 
-    def test_start_callback_exception_stops_loop(self, detection_config, fake_platform):
+    def test_start_callback_exception_does_not_stop_loop(self, detection_config, fake_platform):
         detector = TeamsDetector(detection_config, platform=fake_platform)
         start_cb = MagicMock(side_effect=RuntimeError("callback failed"))
         detector.on_meeting_start = start_cb
@@ -347,41 +347,43 @@ class TestDetectorRunLoop:
         # run() blocks, so execute on a thread.
         t = threading.Thread(target=detector.run, daemon=True)
         t.start()
-        t.join(timeout=5)
+        t.join(timeout=3)
 
-        # The callback exception is caught by the generic except Exception,
-        # which breaks the loop — so the thread should have stopped.
-        assert not t.is_alive()
+        # Callback exception is caught inside _tick() — loop continues.
+        assert t.is_alive()
         start_cb.assert_called_once()
+        detector.stop()
+        t.join(timeout=2)
 
     @patch("src.detector.time")
-    def test_end_callback_exception_stops_loop(self, mock_time, detection_config, fake_platform):
-        # time.time() calls: cooldown_check, cooldown_check, started_at,
-        # ended_at (callback raises before cooldown_set)
-        mock_time.time.side_effect = [0.0, 0.0, 100.0, 200.0]
+    def test_end_callback_exception_does_not_stop_loop(
+        self, mock_time, detection_config, fake_platform
+    ):
+        # Provide enough time values for: cooldown checks, started_at,
+        # ended_at, duration calc, and cooldown_until.
+        mock_time.time.side_effect = [0.0, 0.0, 100.0, 200.0, 200.0, 200.0]
 
         detector = TeamsDetector(detection_config, platform=fake_platform)
         end_cb = MagicMock(side_effect=RuntimeError("end callback failed"))
         detector.on_meeting_end = end_cb
 
-        # Move to ACTIVE via _tick() (bypasses run loop).
+        # Move to ACTIVE via _tick().
         fake_platform.app_running = True
         fake_platform.audio_active = True
         detector._tick()
         detector._tick()
         assert detector.state == MeetingState.ACTIVE
 
-        # Now make detection go negative so the next ticks trigger end.
+        # Trigger end detection.
         fake_platform.app_running = False
         fake_platform.audio_active = False
+        detector._tick()
+        detector._tick()
 
-        # run() will tick and hit the end callback which raises.
-        t = threading.Thread(target=detector.run, daemon=True)
-        t.start()
-        t.join(timeout=5)
-
-        assert not t.is_alive()
+        # Callback raised but _tick() caught it — detector still functional.
         end_cb.assert_called_once()
+        # State still transitions to IDLE despite the callback error.
+        assert detector.state == MeetingState.IDLE
 
 
 # ------------------------------------------------------------------
@@ -466,7 +468,7 @@ class TestDetectorCooldown:
         """After a meeting ends, new meeting signals within the cooldown
         period should be ignored to prevent split meetings."""
         config = DetectionConfig(
-            poll_interval_seconds=0,
+            poll_interval_seconds=1,
             min_meeting_duration_seconds=10,
             required_consecutive_detections=2,
             required_consecutive_end_detections=2,
@@ -524,7 +526,7 @@ class TestDetectorCooldown:
         """After the cooldown period expires, new meetings should be
         detected normally."""
         config = DetectionConfig(
-            poll_interval_seconds=0,
+            poll_interval_seconds=1,
             min_meeting_duration_seconds=0,
             required_consecutive_detections=2,
             required_consecutive_end_detections=2,

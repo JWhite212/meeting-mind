@@ -120,7 +120,7 @@ async def reprocess_meeting(meeting_id: str):
             trans_config,
             summ_config,
         )
-    except Exception as e:
+    except (ValueError, RuntimeError, FileNotFoundError) as e:
         logger.error("Reprocessing failed: %s", e, exc_info=True)
         await _repo.update_meeting(meeting_id, status="error")
         raise HTTPException(

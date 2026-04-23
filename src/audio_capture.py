@@ -58,6 +58,7 @@ class AudioCapture:
         self._mic_path: Path | None = None
         self._blackhole_idx: int | None = None
         self._mic_idx: int | None = None
+        self._mic_available: bool = True
 
         # Audio level callback: called with (system_rms, mic_rms) ~10/sec.
         self.on_audio_level: Callable[[float, float], None] | None = None
@@ -170,7 +171,7 @@ class AudioCapture:
                         try:
                             self.on_audio_data(mono)
                         except Exception:
-                            pass
+                            logger.warning("on_audio_data callback failed", exc_info=True)
                     if self.on_audio_level is not None:
                         latest_system_rms[0] = float(np.sqrt(np.mean(mono**2)))
 
@@ -225,7 +226,7 @@ class AudioCapture:
                     try:
                         self.on_audio_level(latest_system_rms[0], latest_mic_rms[0])
                     except Exception:
-                        pass
+                        logger.warning("on_audio_level callback failed", exc_info=True)
                 time.sleep(0.05)
 
         except Exception as e:
@@ -418,29 +419,6 @@ class AudioCapture:
             output_size_kb,
         )
 
-    @staticmethod
-    def _rms_dbfs(audio: np.ndarray) -> float:
-        """Calculate RMS level in dBFS."""
-        rms = np.sqrt(np.mean(audio**2))
-        if rms < 1e-10:
-            return -100.0
-        return 20.0 * np.log10(rms)
-
-    @staticmethod
-    def _normalise_rms(audio: np.ndarray, target_dbfs: float = TARGET_RMS_DBFS) -> np.ndarray:
-        """
-        Normalise audio in place to a target RMS level in dBFS.
-        Returns the same array. No-op if the audio is silent.
-        """
-        rms = np.sqrt(np.mean(audio**2))
-        if rms < 1e-10:
-            return audio  # Silent — nothing to normalise.
-
-        target_rms = 10.0 ** (target_dbfs / 20.0)
-        gain = target_rms / rms
-        audio *= gain
-        return audio
-
     # ------------------------------------------------------------------
     # Public interface
     # ------------------------------------------------------------------
@@ -474,6 +452,7 @@ class AudioCapture:
 
             # Resolve microphone device.
             self._mic_idx = None
+            self._mic_available = True
             if self._config.mic_enabled:
                 if self._config.mic_device_name:
                     try:
@@ -481,6 +460,7 @@ class AudioCapture:
                             self._config.mic_device_name, kind="microphone"
                         )
                     except AudioCaptureError:
+                        self._mic_available = False
                         logger.warning(
                             "Mic device %r not found. Recording system audio only.",
                             self._config.mic_device_name,
@@ -488,6 +468,7 @@ class AudioCapture:
                 else:
                     self._mic_idx = self._find_default_input_device()
                     if self._mic_idx is None:
+                        self._mic_available = False
                         logger.warning(
                             "No default input device found. Recording system audio only."
                         )
@@ -539,6 +520,11 @@ class AudioCapture:
     @property
     def is_recording(self) -> bool:
         return self._recording
+
+    @property
+    def mic_available(self) -> bool:
+        """Whether the microphone device was found during last start()."""
+        return self._mic_available
 
     @property
     def mic_audio_path(self) -> Path | None:

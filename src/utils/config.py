@@ -33,16 +33,22 @@ _SAFE_PROCESS_NAME = re.compile(r"^[\w\s.()\-]+$")
 
 @dataclass
 class DetectionConfig:
-    poll_interval_seconds: int = 3
+    poll_interval_seconds: int = 2
     min_meeting_duration_seconds: int = 30
-    required_consecutive_detections: int = 3  # Debounce: consecutive positive polls needed.
+    required_consecutive_detections: int = 2  # Debounce: consecutive positive polls needed.
     required_consecutive_end_detections: int = 4  # Debounce for meeting end.
-    min_gap_before_new_meeting: int = 60  # Cooldown seconds after meeting ends.
+    min_gap_before_new_meeting: int = 15  # Cooldown seconds after meeting ends.
     process_names: list[str] = field(
         default_factory=lambda: ["Microsoft Teams", "MSTeams", "Teams"]
     )
 
     def __post_init__(self) -> None:
+        if self.poll_interval_seconds < 1:
+            raise ValueError("poll_interval_seconds must be >= 1")
+        if self.required_consecutive_detections < 1:
+            raise ValueError("required_consecutive_detections must be >= 1")
+        if self.required_consecutive_end_detections < 1:
+            raise ValueError("required_consecutive_end_detections must be >= 1")
         for name in self.process_names:
             if not _SAFE_PROCESS_NAME.match(name):
                 raise ValueError(

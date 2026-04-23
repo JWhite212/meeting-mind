@@ -1,6 +1,5 @@
 """Edge-case tests for src/utils/config.py — supplements test_config.py."""
 
-
 import pytest
 import yaml
 
@@ -26,9 +25,7 @@ def test_detection_config_rejects_shell_injection():
 
 def test_detection_config_valid_process_names():
     """Valid process names should not raise."""
-    config = DetectionConfig(
-        process_names=["Microsoft Teams", "MSTeams", "Teams (work or school)"]
-    )
+    config = DetectionConfig(process_names=["Microsoft Teams", "MSTeams", "Teams (work or school)"])
     assert len(config.process_names) == 3
     assert "Microsoft Teams" in config.process_names
     assert "Teams (work or school)" in config.process_names
@@ -41,22 +38,15 @@ def test_env_var_expansion_in_path(monkeypatch):
 
 
 def test_wrong_type_in_field():
-    """Python dataclasses don't enforce types at runtime.
-
-    Passing a string where int is expected should not raise during
-    construction (Python dataclasses have no runtime type checking).
-    """
-    config = DetectionConfig(poll_interval_seconds="five")
-    # The value is stored as-is — no type coercion or validation.
-    assert config.poll_interval_seconds == "five"
+    """Passing a non-numeric type for a validated field raises during __post_init__."""
+    with pytest.raises(TypeError):
+        DetectionConfig(poll_interval_seconds="five")
 
 
 def test_empty_process_names_list(tmp_path):
     """An empty process_names list is valid — no iteration needed."""
     config_path = tmp_path / "config.yaml"
-    config_path.write_text(
-        yaml.dump({"detection": {"process_names": []}})
-    )
+    config_path.write_text(yaml.dump({"detection": {"process_names": []}}))
     config = load_config(config_path)
     assert config.detection.process_names == []
 

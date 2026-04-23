@@ -41,10 +41,14 @@ def _reset_config_path():
 
 def test_get_config_masks_api_keys(tmp_path):
     config_path = tmp_path / "config.yaml"
-    config_path.write_text(yaml.dump({
-        "summarisation": {"anthropic_api_key": "sk-secret-key-12345"},
-        "notion": {"api_key": "ntn_secret_abcdef"},
-    }))
+    config_path.write_text(
+        yaml.dump(
+            {
+                "summarisation": {"anthropic_api_key": "sk-secret-key-12345"},
+                "notion": {"api_key": "ntn_secret_abcdef"},
+            }
+        )
+    )
     app = _make_config_app(config_path)
     with TestClient(app) as c:
         resp = c.get("/api/config", headers=_auth_headers())
@@ -64,8 +68,16 @@ def test_get_config_returns_full_defaults(tmp_path):
         data = resp.json()
         # All top-level sections should be present.
         for section in [
-            "detection", "audio", "transcription", "summarisation",
-            "diarisation", "markdown", "notion", "logging", "api", "retention",
+            "detection",
+            "audio",
+            "transcription",
+            "summarisation",
+            "diarisation",
+            "markdown",
+            "notion",
+            "logging",
+            "api",
+            "retention",
         ]:
             assert section in data, f"Missing section: {section}"
 
@@ -73,9 +85,13 @@ def test_get_config_returns_full_defaults(tmp_path):
 def test_put_config_preserves_masked_secret(tmp_path):
     config_path = tmp_path / "config.yaml"
     original_key = "sk-real-secret-key"
-    config_path.write_text(yaml.dump({
-        "summarisation": {"anthropic_api_key": original_key},
-    }))
+    config_path.write_text(
+        yaml.dump(
+            {
+                "summarisation": {"anthropic_api_key": original_key},
+            }
+        )
+    )
     app = _make_config_app(config_path)
     with TestClient(app) as c:
         # PUT with the mask value — should preserve the original key.
@@ -93,9 +109,13 @@ def test_put_config_preserves_masked_secret(tmp_path):
 
 def test_put_config_updates_real_value(tmp_path):
     config_path = tmp_path / "config.yaml"
-    config_path.write_text(yaml.dump({
-        "summarisation": {"anthropic_api_key": "old-key"},
-    }))
+    config_path.write_text(
+        yaml.dump(
+            {
+                "summarisation": {"anthropic_api_key": "old-key"},
+            }
+        )
+    )
     app = _make_config_app(config_path)
     with TestClient(app) as c:
         resp = c.put(
@@ -124,12 +144,16 @@ def test_put_config_rejects_unknown_top_level(tmp_path):
 
 def test_deep_merge_nested_dicts(tmp_path):
     config_path = tmp_path / "config.yaml"
-    config_path.write_text(yaml.dump({
-        "detection": {
-            "poll_interval_seconds": 3,
-            "min_meeting_duration_seconds": 30,
-        },
-    }))
+    config_path.write_text(
+        yaml.dump(
+            {
+                "detection": {
+                    "poll_interval_seconds": 3,
+                    "min_meeting_duration_seconds": 30,
+                },
+            }
+        )
+    )
     app = _make_config_app(config_path)
     with TestClient(app) as c:
         # Update only one nested field.
@@ -149,9 +173,13 @@ def test_deep_merge_nested_dicts(tmp_path):
 
 def test_empty_secret_not_masked(tmp_path):
     config_path = tmp_path / "config.yaml"
-    config_path.write_text(yaml.dump({
-        "summarisation": {"anthropic_api_key": ""},
-    }))
+    config_path.write_text(
+        yaml.dump(
+            {
+                "summarisation": {"anthropic_api_key": ""},
+            }
+        )
+    )
     app = _make_config_app(config_path)
     with TestClient(app) as c:
         resp = c.get("/api/config", headers=_auth_headers())

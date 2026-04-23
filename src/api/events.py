@@ -42,10 +42,22 @@ class EventBus:
         self._async_callbacks: list[AsyncCallback] = []
         self._loop: asyncio.AbstractEventLoop | None = None
         self._lock = threading.Lock()
+        self._pending: list[Event] = []
 
     def set_loop(self, loop: asyncio.AbstractEventLoop) -> None:
         """Register the asyncio event loop for async dispatch."""
         self._loop = loop
+        with self._lock:
+            pending, self._pending = self._pending, []
+            async_cbs = list(self._async_callbacks)
+        for event in pending:
+            for cb in async_cbs:
+                try:
+                    asyncio.run_coroutine_threadsafe(cb(event), loop)
+                except Exception:
+                    logger.exception(
+                        "Failed to schedule pending async callback for %s", event.get("type")
+                    )
 
     def subscribe_sync(self, callback: SyncCallback) -> None:
         """Register a synchronous callback (runs on emitter thread)."""
@@ -59,15 +71,11 @@ class EventBus:
 
     def unsubscribe_sync(self, callback: SyncCallback) -> None:
         with self._lock:
-            self._sync_callbacks = [
-                cb for cb in self._sync_callbacks if cb is not callback
-            ]
+            self._sync_callbacks = [cb for cb in self._sync_callbacks if cb is not callback]
 
     def unsubscribe_async(self, callback: AsyncCallback) -> None:
         with self._lock:
-            self._async_callbacks = [
-                cb for cb in self._async_callbacks if cb is not callback
-            ]
+            self._async_callbacks = [cb for cb in self._async_callbacks if cb is not callback]
 
     def emit(self, event: Event) -> None:
         """Emit an event to all subscribers. Thread-safe.
@@ -94,6 +102,8 @@ class EventBus:
         # Async callbacks — schedule on event loop.
         loop = self._loop
         if loop is None or loop.is_closed():
+            with self._lock:
+                self._pending.append(event)
             return
 
         with self._lock:

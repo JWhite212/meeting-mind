@@ -7,6 +7,7 @@ events from the EventBus to all of them.
 
 import json
 import logging
+import threading
 
 from fastapi import WebSocket
 
@@ -18,19 +19,23 @@ class ConnectionManager:
 
     def __init__(self) -> None:
         self._connections: list[WebSocket] = []
+        self._lock = threading.Lock()
 
     async def connect(self, websocket: WebSocket) -> None:
         await websocket.accept()
-        self._connections.append(websocket)
+        with self._lock:
+            self._connections.append(websocket)
         logger.info("WebSocket client connected (%d total)", len(self._connections))
 
     def add(self, websocket: WebSocket) -> None:
         """Register an already-accepted WebSocket connection."""
-        self._connections.append(websocket)
+        with self._lock:
+            self._connections.append(websocket)
         logger.info("WebSocket client connected (%d total)", len(self._connections))
 
     def disconnect(self, websocket: WebSocket) -> None:
-        self._connections = [ws for ws in self._connections if ws is not websocket]
+        with self._lock:
+            self._connections = [ws for ws in self._connections if ws is not websocket]
         logger.info("WebSocket client disconnected (%d remaining)", len(self._connections))
 
     async def broadcast(self, event: dict) -> None:
@@ -38,17 +43,21 @@ class ConnectionManager:
 
         Silently removes clients that have disconnected.
         """
-        if not self._connections:
+        with self._lock:
+            snapshot = list(self._connections)
+
+        if not snapshot:
             return
 
         data = json.dumps(event)
         disconnected: list[WebSocket] = []
 
-        for ws in self._connections:
+        for ws in snapshot:
             try:
                 await ws.send_text(data)
             except Exception:
                 disconnected.append(ws)
 
-        for ws in disconnected:
-            self.disconnect(ws)
+        if disconnected:
+            with self._lock:
+                self._connections = [ws for ws in self._connections if ws not in disconnected]

@@ -1,6 +1,8 @@
 import { create } from "zustand";
 import type { WSEvent, TranscriptSegment } from "../lib/types";
 
+let lastLevelUpdate = 0;
+
 interface AudioLevels {
   system: number;
   mic: number;
@@ -28,6 +30,9 @@ interface AppState {
   /** Model download progress from WebSocket events. */
   modelProgress: Record<string, ModelProgress>;
 
+  /** Whether the microphone was unavailable at recording start. */
+  micUnavailable: boolean;
+
   /** Unread notification count. */
   unreadNotifications: number;
   incrementNotifications: () => void;
@@ -49,6 +54,7 @@ export const useAppStore = create<AppState>((set) => ({
   audioLevels: { system: 0, mic: 0 },
   modelProgress: {},
 
+  micUnavailable: false,
   unreadNotifications: 0,
   incrementNotifications: () =>
     set((state) => ({ unreadNotifications: state.unreadNotifications + 1 })),
@@ -79,7 +85,10 @@ export const useAppStore = create<AppState>((set) => ({
           };
         });
         break;
-      case "audio.level":
+      case "audio.level": {
+        const now = Date.now();
+        if (now - lastLevelUpdate < 250) break;
+        lastLevelUpdate = now;
         set({
           audioLevels: {
             system: event.system_rms ?? 0,
@@ -87,6 +96,7 @@ export const useAppStore = create<AppState>((set) => ({
           },
         });
         break;
+      }
       case "model.download.progress":
         set((state) => ({
           modelProgress: {
@@ -94,6 +104,12 @@ export const useAppStore = create<AppState>((set) => ({
             [event.model]: { percent: event.percent, error: event.error },
           },
         }));
+        break;
+      case "audio.mic_unavailable":
+        set({ micUnavailable: true });
+        break;
+      case "meeting.started":
+        set({ micUnavailable: false });
         break;
       case "notification":
         set((state) => ({

@@ -6,7 +6,7 @@ export function useDaemonStatus() {
   const healthQuery = useQuery({
     queryKey: ["health"],
     queryFn: getHealth,
-    refetchInterval: STATUS_POLL_INTERVAL,
+    refetchInterval: 10000,
     retry: false,
   });
 
