@@ -2,25 +2,41 @@
 #
 # Targets:
 #   make setup            - Create venv, install Python and UI dependencies
+#   make lock             - Regenerate pinned requirements*.lock from .in files
 #   make build            - Build daemon binary, copy resources, build Tauri app
 #   make install          - Build everything, then install the launch agent
 #   make dev              - Start the Tauri dev server with hot-reload
 #   make test             - Run the Python test suite
 #   make lint             - Run ruff linter on src/ and tests/
-#   make typecheck        - Run lint plus pyright (Python) — see typecheck-python
+#   make typecheck        - Run lint plus pyright (Python)
 #   make typecheck-python - Run pyright over src/ (configured in pyproject.toml)
 #   make clean            - Remove all build artefacts
 
-.PHONY: setup build-daemon copy-daemon build-app build install dev test lint \
+.PHONY: setup lock build-daemon copy-daemon build-app build install dev test lint \
         typecheck typecheck-python clean
 
 setup:
 	@echo "==> Creating virtual environment (if missing)"
 	test -d .venv || python3 -m venv .venv
 	@echo "==> Installing Python dependencies"
-	.venv/bin/pip install -r requirements.txt -r requirements-dev.txt
+	.venv/bin/pip install --upgrade pip
+	@if [ -f requirements.lock ] && [ -f requirements-dev.lock ]; then \
+		echo "==> Installing from pinned lock files"; \
+		.venv/bin/pip install -r requirements.lock -r requirements-dev.lock; \
+	else \
+		echo "(!) lock files missing - falling back to requirements*.txt"; \
+		.venv/bin/pip install -r requirements.txt -r requirements-dev.txt; \
+	fi
 	@echo "==> Installing UI dependencies"
 	cd ui && npm install
+
+# Regenerate the pinned lock files from requirements*.in. Run this whenever
+# you change a top-level dependency. Commit the updated *.lock files.
+lock:
+	test -d .venv || python3 -m venv .venv
+	.venv/bin/pip install --upgrade pip-tools
+	.venv/bin/pip-compile --output-file=requirements.lock requirements.in
+	.venv/bin/pip-compile --output-file=requirements-dev.lock requirements-dev.in
 
 build-daemon:
 	./scripts/build_daemon.sh
