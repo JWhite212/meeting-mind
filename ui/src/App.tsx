@@ -6,10 +6,12 @@ import {
   Outlet,
 } from "react-router-dom";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
-import { useCallback, useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 import { invoke } from "@tauri-apps/api/core";
 
 import { ErrorBoundary } from "./components/common/ErrorBoundary";
+import { DaemonConnectionScreen } from "./components/system/DaemonConnectionScreen";
+import { useDaemonConnection } from "./hooks/useDaemonConnection";
 import { Sidebar } from "./components/layout/Sidebar";
 import { Dashboard } from "./components/dashboard/Dashboard";
 import { MeetingList } from "./components/meetings/MeetingList";
@@ -137,21 +139,30 @@ const router = createBrowserRouter(
 );
 
 export default function App() {
-  const [authReady, setAuthReady] = useState(false);
-  const attempted = useRef(false);
+  const { state, error, token, retry, startLocal } = useDaemonConnection();
 
   useEffect(() => {
-    if (attempted.current) return;
-    attempted.current = true;
-    invoke<string>("read_auth_token")
-      .then(setAuthToken)
-      .catch(() => {
-        // Token not available yet — daemon may not have started.
-      })
-      .finally(() => setAuthReady(true));
-  }, []);
+    if (token) setAuthToken(token);
+  }, [token]);
 
-  if (!authReady) return null;
+  if (state !== "connected") {
+    return (
+      <DaemonConnectionScreen
+        state={state}
+        error={error}
+        onRetry={retry}
+        onStartLocal={() => {
+          void startLocal();
+        }}
+        onOpenLogs={() => {
+          void invoke("open_logs_dir");
+        }}
+        onOpenAppSupport={() => {
+          void invoke("open_app_support_dir");
+        }}
+      />
+    );
+  }
 
   return (
     <QueryClientProvider client={queryClient}>

@@ -13,6 +13,7 @@ export type DaemonConnectionState =
 interface UseDaemonConnectionResult {
   state: DaemonConnectionState;
   error: string | null;
+  token: string | null;
   retry: () => void;
   startLocal: () => Promise<void>;
 }
@@ -62,6 +63,7 @@ async function verifyToken(token: string): Promise<boolean> {
 export function useDaemonConnection(): UseDaemonConnectionResult {
   const [state, setState] = useState<DaemonConnectionState>("checking");
   const [error, setError] = useState<string | null>(null);
+  const [token, setToken] = useState<string | null>(null);
   const autoStartTriedRef = useRef(false);
   const tokenAttemptsRef = useRef(0);
   const cancelledRef = useRef(false);
@@ -93,28 +95,32 @@ export function useDaemonConnection(): UseDaemonConnectionResult {
     }
 
     if (!healthy) {
+      setToken(null);
       setState("unavailable");
       return;
     }
 
-    const token = await readToken();
-    if (!token) {
+    const candidate = await readToken();
+    if (!candidate) {
       if (tokenAttemptsRef.current < TOKEN_RETRY_BUDGET) {
         tokenAttemptsRef.current += 1;
         setTimeout(() => probe(), TOKEN_RETRY_DELAY_MS);
         return;
       }
+      setToken(null);
       setState("missing-token");
       return;
     }
 
-    const authorised = await verifyToken(token);
+    const authorised = await verifyToken(candidate);
     if (!authorised) {
+      setToken(null);
       setState("unauthorised");
       return;
     }
 
     tokenAttemptsRef.current = 0;
+    setToken(candidate);
     setState("connected");
   }, []);
 
@@ -143,5 +149,5 @@ export function useDaemonConnection(): UseDaemonConnectionResult {
     void probe();
   }, [probe]);
 
-  return { state, error, retry, startLocal };
+  return { state, error, token, retry, startLocal };
 }
