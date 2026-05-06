@@ -698,6 +698,28 @@ make test                     # Run pytest suite (31 test files)
 make lint                     # Run ruff linter
 ```
 
+### Dependency locking
+
+Python dependencies are managed with [pip-tools](https://github.com/jazzband/pip-tools).
+The loose, human-edited inputs live in `requirements.in` (runtime) and
+`requirements-dev.in` (dev tooling, which includes runtime via
+`-r requirements.in`). The fully pinned outputs are
+`requirements.lock` and `requirements-dev.lock`, both committed to the
+repository.
+
+```bash
+make lock        # Regenerate requirements*.lock from requirements*.in
+make setup       # Installs from the .lock files when present
+```
+
+`make setup` prefers the lock files; if they are missing it falls back
+to `requirements*.txt`, which are themselves thin pointers to the lock
+files. CI installs from the lock files only, so the same versions are
+exercised locally and in GitHub Actions.
+
+To bump a dependency, edit the appropriate `.in` file, run `make lock`,
+then commit both the `.in` and the regenerated `.lock` together.
+
 ### Frontend (Desktop App)
 
 ```bash
