@@ -13,7 +13,11 @@ struct PendingUpdate(Mutex<Option<tauri_plugin_updater::Update>>);
 #[tauri::command]
 fn read_auth_token() -> Result<String, String> {
     let home = dirs::home_dir().unwrap_or_else(|| PathBuf::from("/tmp"));
-    let path: PathBuf = home.join(".config").join("meetingmind").join("auth_token");
+    let path: PathBuf = home
+        .join("Library")
+        .join("Application Support")
+        .join("Context Recall")
+        .join("auth_token");
 
     fs::read_to_string(&path)
         .map(|s| s.trim().to_string())
@@ -42,7 +46,7 @@ async fn check_for_updates(app: tauri::AppHandle) -> Result<Option<String>, Stri
 fn daemon_binary_path(app: tauri::AppHandle) -> Result<String, String> {
     app.path()
         .resource_dir()
-        .map(|p| p.join("meetingmind-daemon").display().to_string())
+        .map(|p| p.join("context-recall-daemon").display().to_string())
         .map_err(|e| e.to_string())
 }
 

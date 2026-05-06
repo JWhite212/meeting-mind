@@ -25,7 +25,7 @@ from src.utils.config import (
     _build_dataclass,
 )
 
-logger = logging.getLogger("meetingmind.api.reprocess")
+logger = logging.getLogger("contextrecall.api.reprocess")
 
 router = APIRouter()
 

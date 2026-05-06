@@ -1,5 +1,5 @@
 #!/bin/bash
-# Build the MeetingMind daemon as a standalone binary via PyInstaller.
+# Build the Context Recall daemon as a standalone binary via PyInstaller.
 #
 # Usage: ./scripts/build_daemon.sh
 #
@@ -24,31 +24,31 @@ if ! python3 -m PyInstaller --version &>/dev/null; then
     pip3 install pyinstaller
 fi
 
-echo "==> Building meetingmind-daemon"
-python3 -m PyInstaller meetingmind.spec --noconfirm
+echo "==> Building context-recall-daemon"
+python3 -m PyInstaller context-recall.spec --noconfirm
 
 # Verify the binary exists.
-BINARY="dist/meetingmind-daemon/meetingmind-daemon"
+BINARY="dist/context-recall-daemon/context-recall-daemon"
 if [ ! -f "$BINARY" ]; then
-    echo "ERROR: Build failed — binary not found at $BINARY"
+    echo "ERROR: Build failed - binary not found at $BINARY"
     exit 1
 fi
 
 # Fix MLX metallib location: PyInstaller puts libmlx.dylib in _internal/
 # but mlx.metallib in _internal/mlx/lib/. MLX resolves the metallib
 # relative to the dylib, so copy it next to libmlx.dylib.
-METALLIB="dist/meetingmind-daemon/_internal/mlx/lib/mlx.metallib"
+METALLIB="dist/context-recall-daemon/_internal/mlx/lib/mlx.metallib"
 if [ -f "$METALLIB" ]; then
-    cp "$METALLIB" "dist/meetingmind-daemon/_internal/mlx.metallib"
+    cp "$METALLIB" "dist/context-recall-daemon/_internal/mlx.metallib"
     echo "==> Copied mlx.metallib next to libmlx.dylib"
 fi
 
 # Report size.
 SIZE=$(du -sh "$BINARY" | cut -f1)
-TOTAL_SIZE=$(du -sh "dist/meetingmind-daemon/" | cut -f1)
+TOTAL_SIZE=$(du -sh "dist/context-recall-daemon/" | cut -f1)
 echo ""
 echo "==> Build complete"
 echo "    Binary:     $BINARY ($SIZE)"
-echo "    Bundle dir: dist/meetingmind-daemon/ ($TOTAL_SIZE)"
+echo "    Bundle dir: dist/context-recall-daemon/ ($TOTAL_SIZE)"
 echo ""
 echo "Test with: $BINARY --help"

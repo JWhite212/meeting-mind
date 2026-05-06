@@ -6,7 +6,7 @@
 
 ## Overview
 
-Five integrated features that transform MeetingMind from a capture/transcription tool into an intelligent meeting assistant:
+Five integrated features that transform Context Recall from a capture/transcription tool into an intelligent meeting assistant:
 
 1. **Recurring Meeting Detection & Trend Analysis** — identify and group related meetings, surface patterns
 2. **Meeting Insights Panel** — analytics dashboard with comparative metrics and health indicators
@@ -469,7 +469,7 @@ Single entry point: `notify(type, title, body, reference_id, channels, priority,
 
 **In-app:** WebSocket event push + badge count + notification drawer
 
-**macOS:** `osascript display notification` with deep links via custom URL scheme (`meetingmind://`)
+**macOS:** `osascript display notification` with deep links via custom URL scheme (`contextrecall://`)
 
 **External:**
 

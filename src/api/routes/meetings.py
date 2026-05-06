@@ -13,8 +13,9 @@ from pydantic import BaseModel, Field
 
 from src.api.schemas import DeleteResponse, MeetingListResponse, MeetingStatsResponse
 from src.utils.config import load_config
+from src.utils.paths import audio_dir as default_audio_dir
 
-logger = logging.getLogger("meetingmind.api.meetings")
+logger = logging.getLogger("contextrecall.api.meetings")
 
 router = APIRouter()
 
@@ -158,12 +159,12 @@ async def delete_meeting(meeting_id: str):
     if meeting.audio_path and os.path.exists(meeting.audio_path):
         resolved = Path(meeting.audio_path).resolve()
         allowed_dirs = [
-            Path(os.path.expanduser("~/Library/Application Support/MeetingMind/audio")).resolve(),
+            default_audio_dir().resolve(),
         ]
         try:
             allowed_dirs.append(Path(load_config().audio.temp_audio_dir).expanduser().resolve())
         except Exception:
-            allowed_dirs.append(Path("/tmp/meetingmind").resolve())
+            allowed_dirs.append(Path("/tmp/contextrecall").resolve())
         if any(resolved.is_relative_to(d) for d in allowed_dirs):
             try:
                 os.remove(meeting.audio_path)
@@ -187,12 +188,12 @@ async def get_meeting_audio(meeting_id: str):
     # Validate the audio file is within an expected directory.
     resolved = Path(meeting.audio_path).resolve()
     allowed_dirs = [
-        Path(os.path.expanduser("~/Library/Application Support/MeetingMind/audio")).resolve(),
+        default_audio_dir().resolve(),
     ]
     try:
         allowed_dirs.append(Path(load_config().audio.temp_audio_dir).expanduser().resolve())
     except Exception:
-        allowed_dirs.append(Path("/tmp/meetingmind").resolve())
+        allowed_dirs.append(Path("/tmp/contextrecall").resolve())
     if not any(resolved.is_relative_to(d) for d in allowed_dirs):
         raise HTTPException(status_code=403, detail="Audio file not found")
 

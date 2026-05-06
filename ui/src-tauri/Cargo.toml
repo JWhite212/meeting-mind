@@ -1,8 +1,8 @@
 [package]
-name = "ui"
+name = "context-recall"
 version = "0.1.0"
-description = "A Tauri App"
-authors = ["you"]
+description = "Local-first macOS meeting transcription, recall, and summarisation assistant"
+authors = ["Jamie White"]
 edition = "2021"
 
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html

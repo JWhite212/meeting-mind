@@ -2,7 +2,7 @@ import { useEffect, useSyncExternalStore } from "react";
 
 export type Theme = "system" | "light" | "dark";
 
-const STORAGE_KEY = "meetingmind-theme";
+const STORAGE_KEY = "contextrecall-theme";
 
 function getStored(): Theme {
   return (localStorage.getItem(STORAGE_KEY) as Theme) || "system";

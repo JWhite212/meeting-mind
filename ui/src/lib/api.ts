@@ -1,4 +1,4 @@
-/** API client for communicating with the MeetingMind daemon. */
+/** API client for communicating with the Context Recall daemon. */
 
 import type {
   ActionItem,
@@ -34,7 +34,7 @@ import { API_BASE } from "./constants";
 
 let authToken: string | null = null;
 
-/** Set the auth token (read from ~/.config/meetingmind/auth_token by the Tauri side). */
+/** Set the auth token (read from ~/Library/Application Support/Context Recall/auth_token by the Tauri side). */
 export function setAuthToken(token: string) {
   authToken = token;
 }

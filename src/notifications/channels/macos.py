@@ -3,7 +3,7 @@
 import asyncio
 import logging
 
-logger = logging.getLogger("meetingmind.notifications.macos")
+logger = logging.getLogger("contextrecall.notifications.macos")
 
 
 async def send(title: str, body: str, subtitle: str = "") -> None:

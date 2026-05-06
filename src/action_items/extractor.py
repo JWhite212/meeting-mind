@@ -8,7 +8,7 @@ from src.summariser import Summariser
 from src.transcriber import Transcript
 from src.utils.config import ActionItemsConfig, SummarisationConfig
 
-logger = logging.getLogger("meetingmind.action_items.extractor")
+logger = logging.getLogger("contextrecall.action_items.extractor")
 
 EXTRACTION_PROMPT = """You are a precise action item extractor. Given a meeting transcript,
 extract all action items, tasks, commitments, and follow-ups.

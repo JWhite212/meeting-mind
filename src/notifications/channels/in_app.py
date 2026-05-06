@@ -4,7 +4,7 @@ import logging
 
 from src.api.events import EventBus
 
-logger = logging.getLogger("meetingmind.notifications.in_app")
+logger = logging.getLogger("contextrecall.notifications.in_app")
 
 
 async def send(

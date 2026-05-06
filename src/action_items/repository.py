@@ -7,7 +7,7 @@ from datetime import date
 
 from src.db.database import Database
 
-logger = logging.getLogger("meetingmind.action_items")
+logger = logging.getLogger("contextrecall.action_items")
 
 _VALID_STATUSES = frozenset({"open", "in_progress", "done", "cancelled"})
 _VALID_PRIORITIES = frozenset({"low", "medium", "high", "urgent"})

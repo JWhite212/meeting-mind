@@ -1,7 +1,7 @@
 #!/bin/bash
-# Create a styled .dmg installer for MeetingMind.
+# Create a styled .dmg installer for Context Recall.
 #
-# Usage: ./scripts/create_dmg.sh [path/to/MeetingMind.app]
+# Usage: ./scripts/create_dmg.sh [path/to/Context Recall.app]
 #
 # Requires: create-dmg (brew install create-dmg)
 
@@ -10,9 +10,9 @@ set -euo pipefail
 SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
 PROJECT_ROOT="$(cd "$SCRIPT_DIR/.." && pwd)"
 
-APP_PATH="${1:-$PROJECT_ROOT/ui/src-tauri/target/release/bundle/macos/MeetingMind.app}"
+APP_PATH="${1:-$PROJECT_ROOT/ui/src-tauri/target/release/bundle/macos/Context Recall.app}"
 DMG_DIR="$PROJECT_ROOT/dist"
-DMG_NAME="MeetingMind.dmg"
+DMG_NAME="Context Recall.dmg"
 BACKGROUND="$SCRIPT_DIR/dmg/background.png"
 
 if [ ! -d "$APP_PATH" ]; then
@@ -39,15 +39,15 @@ rm -f "$DMG_DIR/$DMG_NAME"
 
 echo "==> Creating DMG"
 create-dmg \
-    --volname "MeetingMind" \
+    --volname "Context Recall" \
     --volicon "$PROJECT_ROOT/ui/src-tauri/icons/icon.icns" \
     --background "$BACKGROUND" \
     --window-pos 200 120 \
     --window-size 660 400 \
     --icon-size 80 \
-    --icon "MeetingMind.app" 190 190 \
+    --icon "Context Recall.app" 190 190 \
     --app-drop-link 470 190 \
-    --hide-extension "MeetingMind.app" \
+    --hide-extension "Context Recall.app" \
     --no-internet-enable \
     "$DMG_DIR/$DMG_NAME" \
     "$APP_PATH"

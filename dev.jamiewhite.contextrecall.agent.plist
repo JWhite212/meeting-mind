@@ -4,40 +4,40 @@
 <plist version="1.0">
 <dict>
     <!--
-        MeetingMind Launch Agent
+        Context Recall Launch Agent
         Starts the daemon automatically on user login.
 
-        This file is a template — /Users/USER/ is a placeholder.
+        This file is a template; /Users/USER/ is a placeholder.
         Run "make install" or "./scripts/install.sh" to install with
         the correct paths substituted for your user account.
 
         Manual installation:
-          cp com.meetingmind.agent.plist ~/Library/LaunchAgents/
-          launchctl load ~/Library/LaunchAgents/com.meetingmind.agent.plist
+          cp dev.jamiewhite.contextrecall.agent.plist ~/Library/LaunchAgents/
+          launchctl load ~/Library/LaunchAgents/dev.jamiewhite.contextrecall.agent.plist
 
         Removal:
-          launchctl unload ~/Library/LaunchAgents/com.meetingmind.agent.plist
-          rm ~/Library/LaunchAgents/com.meetingmind.agent.plist
+          launchctl unload ~/Library/LaunchAgents/dev.jamiewhite.contextrecall.agent.plist
+          rm ~/Library/LaunchAgents/dev.jamiewhite.contextrecall.agent.plist
     -->
     <key>Label</key>
-    <string>com.meetingmind.agent</string>
+    <string>dev.jamiewhite.contextrecall.agent</string>
 
     <key>ProgramArguments</key>
     <array>
         <!--
             Production (PyInstaller binary):
-              <string>/Applications/MeetingMind.app/Contents/Resources/meetingmind-daemon</string>
+              <string>/Applications/Context Recall.app/Contents/Resources/resources/context-recall-daemon/context-recall-daemon</string>
 
             Development (Python venv):
-              <string>/path/to/meeting-mind/.venv/bin/python3</string>
+              <string>/path/to/context-recall/.venv/bin/python3</string>
               <string>-m</string>
               <string>src.main</string>
         -->
-        <string>/Applications/MeetingMind.app/Contents/Resources/resources/meetingmind-daemon/meetingmind-daemon</string>
+        <string>/Applications/Context Recall.app/Contents/Resources/resources/context-recall-daemon/context-recall-daemon</string>
     </array>
 
     <key>WorkingDirectory</key>
-    <string>/Applications/MeetingMind.app/Contents/Resources/resources/meetingmind-daemon</string>
+    <string>/Applications/Context Recall.app/Contents/Resources/resources/context-recall-daemon</string>
 
     <!-- Start automatically on login. -->
     <key>RunAtLoad</key>
@@ -56,8 +56,8 @@
 
     <!-- Log to ~/Library/Logs for easier debugging. -->
     <key>StandardOutPath</key>
-    <string>/Users/USER/Library/Logs/meetingmind/stdout.log</string>
+    <string>/Users/USER/Library/Logs/Context Recall/stdout.log</string>
     <key>StandardErrorPath</key>
-    <string>/Users/USER/Library/Logs/meetingmind/stderr.log</string>
+    <string>/Users/USER/Library/Logs/Context Recall/stderr.log</string>
 </dict>
 </plist>

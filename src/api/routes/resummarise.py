@@ -17,7 +17,7 @@ from src.templates import TemplateManager
 from src.transcriber import Transcript, TranscriptSegment
 from src.utils.config import DEFAULT_CONFIG_PATH, SummarisationConfig, _build_dataclass
 
-logger = logging.getLogger("meetingmind.api.resummarise")
+logger = logging.getLogger("contextrecall.api.resummarise")
 
 router = APIRouter()
 

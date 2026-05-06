@@ -10,7 +10,7 @@ import httpx
 
 from src.utils.config import EmailChannelConfig, WebhookChannelConfig
 
-logger = logging.getLogger("meetingmind.notifications.external")
+logger = logging.getLogger("contextrecall.notifications.external")
 
 
 async def send_webhook(
@@ -68,7 +68,7 @@ async def send_email(
 def _send_email_sync(config: EmailChannelConfig, title: str, body: str) -> None:
     """Blocking SMTP send — runs in executor."""
     msg = MIMEMultipart("alternative")
-    msg["Subject"] = f"[MeetingMind] {title}"
+    msg["Subject"] = f"[Context Recall] {title}"
     msg["From"] = config.from_address or config.smtp_user
     msg["To"] = config.to_address
     msg.attach(MIMEText(body, "plain"))

@@ -1,5 +1,5 @@
 """
-WebSocket connection manager for MeetingMind.
+WebSocket connection manager for Context Recall.
 
 Maintains a set of connected WebSocket clients and broadcasts
 events from the EventBus to all of them.
@@ -10,7 +10,7 @@ import logging
 
 from fastapi import WebSocket
 
-logger = logging.getLogger("meetingmind.websocket")
+logger = logging.getLogger("contextrecall.websocket")
 
 
 class ConnectionManager:

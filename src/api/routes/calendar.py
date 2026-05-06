@@ -8,7 +8,7 @@ import logging
 
 from fastapi import APIRouter, HTTPException, Query
 
-logger = logging.getLogger("meetingmind.api.calendar")
+logger = logging.getLogger("contextrecall.api.calendar")
 
 router = APIRouter()
 

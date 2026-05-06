@@ -1,15 +1,15 @@
 # -*- mode: python ; coding: utf-8 -*-
 """
-PyInstaller spec for MeetingMind daemon.
+PyInstaller spec for Context Recall daemon.
 
-Produces a directory-mode bundle at dist/meetingmind-daemon/ containing
+Produces a directory-mode bundle at dist/context-recall-daemon/ containing
 the daemon binary and all dependencies. Directory mode is preferred over
 one-file because:
   - Individual binaries can be codesigned on macOS
   - Faster startup (no temp extraction)
   - Easier debugging
 
-Build: pyinstaller meetingmind.spec
+Build: pyinstaller context-recall.spec
 """
 
 from PyInstaller.utils.hooks import (
@@ -159,7 +159,7 @@ exe = EXE(
     a.scripts,
     [],
     exclude_binaries=True,
-    name="meetingmind-daemon",
+    name="context-recall-daemon",
     debug=False,
     bootloader_ignore_signals=False,
     strip=False,
@@ -175,5 +175,5 @@ coll = COLLECT(
     a.datas,
     strip=False,
     upx=False,
-    name="meetingmind-daemon",
+    name="context-recall-daemon",
 )

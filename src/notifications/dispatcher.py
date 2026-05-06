@@ -7,7 +7,7 @@ from src.notifications.channels import external, in_app, macos
 from src.notifications.repository import NotificationRepository
 from src.utils.config import NotificationsConfig
 
-logger = logging.getLogger("meetingmind.notifications.dispatcher")
+logger = logging.getLogger("contextrecall.notifications.dispatcher")
 
 
 class NotificationDispatcher:

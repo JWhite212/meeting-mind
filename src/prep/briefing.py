@@ -10,7 +10,7 @@ from src.series.repository import SeriesRepository
 from src.summariser import Summariser
 from src.utils.config import PrepConfig, SummarisationConfig
 
-logger = logging.getLogger("meetingmind.prep")
+logger = logging.getLogger("contextrecall.prep")
 
 PREP_PROMPT = """You are preparing a concise meeting briefing. Generate a prep document with:
 1. **Key Context** - what was discussed in previous meetings, decisions made

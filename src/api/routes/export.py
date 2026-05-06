@@ -13,7 +13,7 @@ import yaml
 from fastapi import APIRouter, HTTPException, Query
 from fastapi.responses import JSONResponse, PlainTextResponse
 
-logger = logging.getLogger("meetingmind.api.export")
+logger = logging.getLogger("contextrecall.api.export")
 
 router = APIRouter()
 

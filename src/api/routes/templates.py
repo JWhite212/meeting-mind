@@ -14,7 +14,7 @@ from pydantic import BaseModel, Field
 
 from src.templates import SummaryTemplate, TemplateManager
 
-logger = logging.getLogger("meetingmind.api.templates")
+logger = logging.getLogger("contextrecall.api.templates")
 
 router = APIRouter()
 

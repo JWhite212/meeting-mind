@@ -1,4 +1,4 @@
-# Secrets — config.yaml contains real API keys
+# Secrets: config.yaml contains real API keys
 config.yaml
 
 # Python
@@ -20,7 +20,7 @@ ui/src-tauri/target/
 ui/dist/
 
 # Bundled daemon binary (built via PyInstaller, copied into Tauri resources)
-ui/src-tauri/resources/meetingmind-daemon
+ui/src-tauri/resources/context-recall-daemon
 
 # PyInstaller output
 dist/
@@ -28,4 +28,4 @@ build/
 
 # Node
 ui/node_modules/
-# Log files are stored outside the repo (~/Library/Logs/MeetingMind/)
+# Log files are stored outside the repo (~/Library/Logs/Context Recall/)

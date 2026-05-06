@@ -17,7 +17,7 @@ python3 -m src.main --record-now       # Manual: record immediately, Ctrl+C to s
 python3 -m src.main --process file.wav # Process an existing audio file
 
 # Verify imports
-python3 -c "from src.main import MeetingMind"
+python3 -c "from src.main import ContextRecall"
 
 # Run tests
 pip install -r requirements-dev.txt
@@ -28,13 +28,13 @@ ruff check src/ tests/                # Lint check
 
 ## Architecture
 
-MeetingMind is a macOS-only daemon that auto-detects Teams meetings, records audio, transcribes locally, and produces AI summaries. The pipeline is strictly sequential:
+Context Recall is a macOS-only daemon that auto-detects Teams meetings, records audio, transcribes locally, and produces AI summaries. The pipeline is strictly sequential:
 
 ```
 TeamsDetector → AudioCapture → Transcriber → Diariser → Summariser → Writers
 ```
 
-**`src/main.py`** — Orchestrator (`MeetingMind` class). Wires all components together, manages lifecycle. The detector's callbacks trigger start/stop on the capture, then `_process_audio()` runs the rest of the pipeline sequentially.
+**`src/main.py`** — Orchestrator (`ContextRecall` class). Wires all components together, manages lifecycle. The detector's callbacks trigger start/stop on the capture, then `_process_audio()` runs the rest of the pipeline sequentially.
 
 **`src/detector.py`** — State machine (IDLE → ACTIVE → ENDING) with debounce. Delegates platform-specific detection (pgrep, lsof, osascript) to `src/platform/` implementations via `PlatformDetector` protocol.
 

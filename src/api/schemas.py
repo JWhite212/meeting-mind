@@ -1,5 +1,5 @@
 """
-Pydantic response models for the MeetingMind API.
+Pydantic response models for the Context Recall API.
 
 These models provide type documentation and auto-generate OpenAPI schemas
 at /docs. They do NOT re-validate outgoing data (use mode="serialization"

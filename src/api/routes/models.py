@@ -20,7 +20,7 @@ from src.api.schemas import ModelDownloadResponse, ModelListResponse
 if TYPE_CHECKING:
     from src.api.events import EventBus
 
-logger = logging.getLogger("meetingmind.api.models")
+logger = logging.getLogger("contextrecall.api.models")
 
 router = APIRouter()
 
@@ -75,9 +75,7 @@ def _download_worker(model_name: str) -> None:
 
         api = HfApi()
         model_info = api.model_info(repo_id)
-        total_bytes = sum(
-            s.size for s in (model_info.siblings or []) if s.size
-        )
+        total_bytes = sum(s.size for s in (model_info.siblings or []) if s.size)
 
         last_percent = -1
 
@@ -89,11 +87,13 @@ def _download_worker(model_name: str) -> None:
             with _download_lock:
                 _downloads[model_name]["percent"] = percent
             if _event_bus:
-                _event_bus.emit({
-                    "type": "model.download.progress",
-                    "model": model_name,
-                    "percent": percent,
-                })
+                _event_bus.emit(
+                    {
+                        "type": "model.download.progress",
+                        "model": model_name,
+                        "percent": percent,
+                    }
+                )
 
         _emit_progress(0)
 
@@ -135,11 +135,13 @@ def _download_worker(model_name: str) -> None:
             }
 
         if _event_bus:
-            _event_bus.emit({
-                "type": "model.download.progress",
-                "model": model_name,
-                "percent": 100,
-            })
+            _event_bus.emit(
+                {
+                    "type": "model.download.progress",
+                    "model": model_name,
+                    "percent": 100,
+                }
+            )
 
         logger.info("Model download complete: %s", model_name)
     except Exception as e:
@@ -151,20 +153,20 @@ def _download_worker(model_name: str) -> None:
                 "percent": 0,
             }
         if _event_bus:
-            _event_bus.emit({
-                "type": "model.download.progress",
-                "model": model_name,
-                "percent": 0,
-                "error": str(e),
-            })
+            _event_bus.emit(
+                {
+                    "type": "model.download.progress",
+                    "model": model_name,
+                    "percent": 0,
+                    "error": str(e),
+                }
+            )
 
 
 @router.get("/api/models", response_model=ModelListResponse, summary="List Whisper models")
 async def list_models():
     # Run the blocking cache scan in a thread pool to keep the event loop free.
-    cached_repos = await asyncio.get_running_loop().run_in_executor(
-        None, _downloaded_repos
-    )
+    cached_repos = await asyncio.get_running_loop().run_in_executor(None, _downloaded_repos)
     models = []
     for name, info in AVAILABLE_MODELS.items():
         downloaded = info["repo"] in cached_repos
@@ -183,14 +185,16 @@ async def list_models():
             elif dl["status"] == "complete":
                 status = "downloaded"
 
-        models.append({
-            "name": name,
-            "repo": info["repo"],
-            "size_mb": info["size_mb"],
-            "status": status,
-            "percent": percent,
-            "error": dl["error"] if dl and dl["status"] == "error" else None,
-        })
+        models.append(
+            {
+                "name": name,
+                "repo": info["repo"],
+                "size_mb": info["size_mb"],
+                "status": status,
+                "percent": percent,
+                "error": dl["error"] if dl and dl["status"] == "error" else None,
+            }
+        )
 
     return {"models": models}
 

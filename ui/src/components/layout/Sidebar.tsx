@@ -214,7 +214,7 @@ export function Sidebar({ daemonRunning }: SidebarProps) {
       {/* Titlebar drag region */}
       <div data-tauri-drag-region className="h-[52px] flex items-end px-4 pb-2">
         <span className="text-sm font-semibold text-text-primary tracking-tight">
-          MeetingMind
+          Context Recall
         </span>
       </div>
 

@@ -1,5 +1,5 @@
 """
-Data access layer for MeetingMind meetings.
+Data access layer for Context Recall meetings.
 
 Provides async CRUD operations over the SQLite database.
 """
@@ -15,7 +15,7 @@ from typing import Any
 
 from src.db.database import Database
 
-logger = logging.getLogger("meetingmind.db")
+logger = logging.getLogger("contextrecall.db")
 
 # Columns that update_meeting() is allowed to write.
 _MUTABLE_COLUMNS = frozenset(

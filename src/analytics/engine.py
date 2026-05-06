@@ -10,7 +10,7 @@ from src.analytics.repository import AnalyticsRepository
 from src.db.repository import MeetingRepository
 from src.utils.config import AnalyticsConfig
 
-logger = logging.getLogger("meetingmind.analytics")
+logger = logging.getLogger("contextrecall.analytics")
 
 
 class AnalyticsEngine:

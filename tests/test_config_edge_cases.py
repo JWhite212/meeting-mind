@@ -1,6 +1,5 @@
 """Edge-case tests for src/utils/config.py — supplements test_config.py."""
 
-
 import pytest
 import yaml
 
@@ -26,18 +25,16 @@ def test_detection_config_rejects_shell_injection():
 
 def test_detection_config_valid_process_names():
     """Valid process names should not raise."""
-    config = DetectionConfig(
-        process_names=["Microsoft Teams", "MSTeams", "Teams (work or school)"]
-    )
+    config = DetectionConfig(process_names=["Microsoft Teams", "MSTeams", "Teams (work or school)"])
     assert len(config.process_names) == 3
     assert "Microsoft Teams" in config.process_names
     assert "Teams (work or school)" in config.process_names
 
 
 def test_env_var_expansion_in_path(monkeypatch):
-    monkeypatch.setenv("MEETINGMIND_TEST_DIR", "/tmp/test-meeting-mind")
-    result = _expand_path("$MEETINGMIND_TEST_DIR/output")
-    assert "/tmp/test-meeting-mind/output" in result
+    monkeypatch.setenv("CONTEXTRECALL_TEST_DIR", "/tmp/test-context-recall")
+    result = _expand_path("$CONTEXTRECALL_TEST_DIR/output")
+    assert "/tmp/test-context-recall/output" in result
 
 
 def test_wrong_type_in_field():
@@ -54,9 +51,7 @@ def test_wrong_type_in_field():
 def test_empty_process_names_list(tmp_path):
     """An empty process_names list is valid — no iteration needed."""
     config_path = tmp_path / "config.yaml"
-    config_path.write_text(
-        yaml.dump({"detection": {"process_names": []}})
-    )
+    config_path.write_text(yaml.dump({"detection": {"process_names": []}}))
     config = load_config(config_path)
     assert config.detection.process_names == []
 

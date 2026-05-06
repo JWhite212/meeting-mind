@@ -2,7 +2,7 @@
 
 > **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox syntax for tracking.
 
-**Goal:** Add frontend views for action items, insights panel, notifications, prep briefings, and series management to the MeetingMind Tauri/React UI.
+**Goal:** Add frontend views for action items, insights panel, notifications, prep briefings, and series management to the Context Recall Tauri/React UI.
 
 **Architecture:** Extends the existing React + React Router + React Query + Zustand + Tailwind stack. Each feature gets its own component directory under `ui/src/components/`. API functions added to `ui/src/lib/api.ts`, types to `ui/src/lib/types.ts`. The sidebar gains new nav items (Action Items, Insights) and a notification bell. No new dependencies -- charts built with Tailwind/HTML following the existing MeetingHeatmap pattern.
 

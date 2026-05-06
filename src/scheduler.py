@@ -1,4 +1,4 @@
-"""Lightweight asyncio scheduler for MeetingMind background tasks.
+"""Lightweight asyncio scheduler for Context Recall background tasks.
 
 Runs periodic jobs (analytics refresh, prep triggers, reminder checks)
 on a single asyncio task. Jobs that raise are logged but don't crash
@@ -11,7 +11,7 @@ import time
 from dataclasses import dataclass
 from typing import Awaitable, Callable
 
-logger = logging.getLogger("meetingmind.scheduler")
+logger = logging.getLogger("contextrecall.scheduler")
 
 Job = Callable[[], Awaitable[None]]
 

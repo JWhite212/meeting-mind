@@ -11,7 +11,7 @@ from datetime import datetime, timezone
 
 from src.db.database import Database
 
-logger = logging.getLogger("meetingmind.series")
+logger = logging.getLogger("contextrecall.series")
 
 _MUTABLE_FIELDS = frozenset(
     {

@@ -1,11 +1,11 @@
 <p align="center">
-  <img src="ui/src-tauri/icons/icon.png" width="120" alt="MeetingMind icon" />
+  <img src="ui/src-tauri/icons/icon.png" width="120" alt="Context Recall icon" />
 </p>
 
-<h1 align="center">MeetingMind</h1>
+<h1 align="center">Context Recall</h1>
 
 <p align="center">
-  <strong>A macOS desktop app that automatically detects Microsoft Teams meetings, transcribes them locally with Apple Silicon GPU acceleration, and produces structured AI-powered summaries — completely offline and invisible to other participants.</strong>
+  <strong>Context Recall is a local-first macOS meeting assistant that captures configured local audio sources, transcribes meetings with MLX Whisper, stores transcripts locally, and helps users recall decisions, action items, and context from previous meetings.</strong>
 </p>
 
 <p align="center">
@@ -32,15 +32,15 @@
 
 ---
 
-![MeetingMind dashboard](docs/screenshots/dashboard.png)
+![Context Recall dashboard](docs/screenshots/dashboard.png)
 
 ---
 
 ## Overview
 
-MeetingMind runs silently in the background, watching for active Teams calls. When a meeting starts, it captures both sides of the conversation — remote participants via system audio loopback and your voice via the microphone — then runs the recording through on-device speech-to-text and an AI summariser to produce structured notes with action items, decisions, and key topics.
+Context Recall is a local-first macOS meeting assistant. With user-controlled capture configured, it watches for active Teams calls and records the audio sources you have set up (remote participants via system audio loopback and your voice via the microphone), then runs the recording through on-device speech-to-text and an AI summariser to produce structured notes with action items, decisions, and key topics.
 
-Everything runs locally on your Mac. No cloud transcription, no bots joining calls, no data leaving your machine (unless you opt into the Claude API for summarisation).
+Everything runs locally on your Mac. No cloud transcription, no bots joining calls, no data leaving your machine (unless you opt into the Claude API for summarisation). Recordings are intended for consented meetings only; see the legal note below.
 
 ### Output Formats
 
@@ -63,7 +63,7 @@ Everything runs locally on your Mac. No cloud transcription, no bots joining cal
 
 ```mermaid
 flowchart TB
-    subgraph Daemon["MeetingMind Daemon · Python"]
+    subgraph Daemon["Context Recall Daemon · Python"]
         direction TB
         Detect["🔍 Detector<br/><sub>pgrep · lsof · osascript</sub>"]
         Capture["🎙️ Audio Capture<br/><sub>BlackHole + Microphone</sub>"]
@@ -81,7 +81,7 @@ flowchart TB
         API <--> DB
     end
 
-    subgraph UI["MeetingMind Desktop App · Tauri v2 + React"]
+    subgraph UI["Context Recall Desktop App · Tauri v2 + React"]
         direction LR
         Dash["📊 Dashboard"]
         Meet["📋 Meetings"]
@@ -130,17 +130,14 @@ sequenceDiagram
 
 ---
 
-## Why Other Participants Can't Tell
+## Privacy and Consent
 
-Teams notifies participants when:
+Context Recall is local-first and user-controlled. It captures only the audio sources you have configured (your system output via a loopback driver such as BlackHole, plus your microphone) and processes the recording entirely on your Mac. There is no bot, no Teams API integration, and no audio leaves the machine (unless you opt into the Claude API for summarisation).
 
-- A **recording is started via the Teams UI**
-- A **bot joins** the meeting
+Because this is a privacy-conscious meeting recall tool rather than a Teams-integrated recorder, recordings should only be made for meetings where the participants have given consent.
 
-MeetingMind does neither. It captures your local system audio via a loopback driver (BlackHole), which is functionally identical to listening through your speakers. No network traffic, no bot, no Teams API calls — from everyone else's perspective, nothing has changed.
-
-> [!NOTE]
-> Recording meetings may have legal implications depending on your jurisdiction. Many regions operate under "one-party consent" laws, meaning you can record a conversation you participate in. Verify the laws and policies that apply to you before use.
+> [!IMPORTANT]
+> Recording meetings has legal implications that vary by jurisdiction. Many regions operate under "one-party consent" laws; others require all-party consent. You are responsible for obtaining appropriate consent and for complying with the laws and policies that apply to you and the other participants. Use Context Recall only for consented recordings.
 
 ---
 
@@ -216,7 +213,7 @@ MeetingMind does neither. It captures your local system audio via a loopback dri
 
 ## Audio Pipeline
 
-MeetingMind records system audio and microphone to **separate WAV files** using independent audio streams, then merges them after capture with RMS normalisation.
+Context Recall records system audio and microphone to **separate WAV files** using independent audio streams, then merges them after capture with RMS normalisation.
 
 ```mermaid
 flowchart LR
@@ -244,7 +241,7 @@ flowchart LR
 
 ## Speaker Diarisation
 
-MeetingMind supports two diarisation backends:
+Context Recall supports two diarisation backends:
 
 ### Energy-based (default)
 
@@ -314,8 +311,8 @@ ollama serve
 ### 3. Install
 
 ```bash
-git clone https://github.com/JWhite212/meeting-mind.git
-cd meeting-mind
+git clone https://github.com/JWhite212/context-recall.git
+cd context-recall
 python3 -m venv .venv
 source .venv/bin/activate
 pip install -r requirements.txt
@@ -389,8 +386,8 @@ make install # Build + install launch agent
 ### Run as a Launch Agent (Auto-Start on Login)
 
 ```bash
-cp com.meetingmind.agent.plist ~/Library/LaunchAgents/
-launchctl load ~/Library/LaunchAgents/com.meetingmind.agent.plist
+cp dev.jamiewhite.contextrecall.agent.plist ~/Library/LaunchAgents/
+launchctl load ~/Library/LaunchAgents/dev.jamiewhite.contextrecall.agent.plist
 ```
 
 ---
@@ -459,7 +456,7 @@ audio:
   system_volume: 1.0
   sample_rate: 16000
   channels: 1
-  temp_audio_dir: "/tmp/meetingmind"
+  temp_audio_dir: "~/Library/Application Support/Context Recall/audio"
   keep_source_files: false
 
 # Transcription (MLX Whisper — Apple Silicon GPU)
@@ -523,7 +520,7 @@ api:
 # Logging
 logging:
   level: "INFO"
-  log_file: "~/Library/Logs/meetingmind.log"
+  log_file: "~/Library/Logs/Context Recall/contextrecall.log"
 ```
 
 </details>
@@ -578,15 +575,15 @@ All endpoints require HMAC token authentication. The WebSocket uses a message-ba
 ## Project Structure
 
 ```
-meeting-mind/
+context-recall/
 ├── config.example.yaml              # Config template (tracked)
-├── meetingmind.spec                 # PyInstaller build spec
+├── context-recall.spec              # PyInstaller build spec
 ├── pyproject.toml                   # Project metadata, pytest & ruff config
 ├── Makefile                         # Build automation (setup, build, test, lint)
-├── com.meetingmind.agent.plist      # launchd agent for auto-start on login
+├── dev.jamiewhite.contextrecall.agent.plist  # launchd agent for auto-start on login
 │
 ├── src/                             # Python daemon
-│   ├── main.py                      # Orchestrator (MeetingMind class)
+│   ├── main.py                      # Orchestrator (ContextRecall class)
 │   ├── detector.py                  # State machine + debounce logic
 │   ├── audio_capture.py             # Dual-source recording + RMS merge
 │   ├── transcriber.py               # MLX Whisper speech-to-text
@@ -717,7 +714,7 @@ make build                    # Build daemon binary + Tauri .app/.dmg
 make install                  # Build + install launch agent
 
 # Or step by step:
-./scripts/build_daemon.sh     # PyInstaller → dist/meetingmind-daemon/
+./scripts/build_daemon.sh     # PyInstaller → dist/context-recall-daemon/
 cd ui && npm run tauri build  # Tauri → .app + .dmg
 ```
 
@@ -805,7 +802,7 @@ Contributions and issue-tracked suggestions welcome.
 
 ## Author
 
-**Jamie White** — early-career software engineer building MeetingMind as a personal product focused on local-first, privacy-respecting tooling.
+**Jamie White** — early-career software engineer building Context Recall as a personal product focused on local-first, privacy-conscious meeting recall.
 
 <p>
   <a href="https://jamie-white-portfolio.vercel.app">Portfolio</a> ·
@@ -813,7 +810,9 @@ Contributions and issue-tracked suggestions welcome.
   <a href="https://www.linkedin.com/in/jamie-white-swe/">LinkedIn</a>
 </p>
 
-If you're hiring for a software engineering role and want to discuss how MeetingMind was built — from the dual-source audio pipeline to on-device GPU transcription, speaker diarisation, and the Tauri desktop shell — email **jamiecs@live.co.uk**.
+Context Recall is a local-first macOS meeting assistant built with a Python daemon, Tauri v2, React, TypeScript, FastAPI, SQLite/FTS5, and MLX Whisper. It captures configured local audio sources for consented meetings, transcribes on-device using Apple Silicon acceleration, and provides searchable meeting history, summaries, action items, and exports.
+
+If you're hiring for a software engineering role and want to discuss how Context Recall was built — from the dual-source audio pipeline to on-device GPU transcription, speaker diarisation, and the Tauri desktop shell — email **jamiecs@live.co.uk**.
 
 ## License
 

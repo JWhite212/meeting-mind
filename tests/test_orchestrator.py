@@ -1,4 +1,4 @@
-"""Tests for src/main.py — MeetingMind orchestrator with heavy mocking."""
+"""Tests for src/main.py - Context Recall orchestrator with heavy mocking."""
 
 from unittest.mock import MagicMock, patch
 
@@ -11,7 +11,7 @@ from src.transcriber import Transcript, TranscriptSegment
 
 @pytest.fixture
 def tmp_config(tmp_path):
-    """Create a minimal config.yaml for MeetingMind init."""
+    """Create a minimal config.yaml for Context Recall init."""
     log_dir = tmp_path / "logs"
     log_dir.mkdir()
     config = {
@@ -86,9 +86,9 @@ def test_transcription_failure_does_not_crash_pipeline(
     tmp_config,
     audio_file,
 ):
-    from src.main import MeetingMind
+    from src.main import ContextRecall
 
-    app = MeetingMind(config_path=tmp_config)
+    app = ContextRecall(config_path=tmp_config)
     app._transcriber.transcribe.side_effect = RuntimeError("Transcription exploded")
 
     # Should not raise.
@@ -109,9 +109,9 @@ def test_summarisation_failure_does_not_crash_pipeline(
     tmp_config,
     audio_file,
 ):
-    from src.main import MeetingMind
+    from src.main import ContextRecall
 
-    app = MeetingMind(config_path=tmp_config)
+    app = ContextRecall(config_path=tmp_config)
     app._transcriber.transcribe.return_value = _make_transcript()
     app._summariser.summarise.side_effect = RuntimeError("Summarisation exploded")
 
@@ -133,9 +133,9 @@ def test_short_transcript_skips_summarisation(
     tmp_config,
     audio_file,
 ):
-    from src.main import MeetingMind
+    from src.main import ContextRecall
 
-    app = MeetingMind(config_path=tmp_config)
+    app = ContextRecall(config_path=tmp_config)
     app._transcriber.transcribe.return_value = _make_short_transcript()
 
     app._process_audio(audio_file, started_at=1000.0, duration_seconds=60.0)
@@ -156,7 +156,7 @@ def test_diarisation_conditional_execution(
     tmp_path,
     audio_file,
 ):
-    from src.main import MeetingMind
+    from src.main import ContextRecall
 
     # Enable diarisation in config.
     log_dir = tmp_path / "logs"
@@ -179,7 +179,7 @@ def test_diarisation_conditional_execution(
         mock_diariser = MagicMock(spec=["diarise"])
         mock_factory.return_value = mock_diariser
 
-        app = MeetingMind(config_path=config_path)
+        app = ContextRecall(config_path=config_path)
         transcript = _make_transcript()
         app._transcriber.transcribe.return_value = transcript
         # Diariser.diarise returns the (mutated) transcript.
@@ -203,7 +203,7 @@ def test_markdown_writer_conditional_execution(
     tmp_path,
     audio_file,
 ):
-    from src.main import MeetingMind
+    from src.main import ContextRecall
 
     log_dir = tmp_path / "logs"
     log_dir.mkdir()
@@ -225,7 +225,7 @@ def test_markdown_writer_conditional_execution(
         mock_md_writer = MagicMock()
         mock_md_cls.return_value = mock_md_writer
 
-        app = MeetingMind(config_path=config_path)
+        app = ContextRecall(config_path=config_path)
         app._transcriber.transcribe.return_value = _make_transcript()
         app._summariser.summarise.return_value = _make_summary()
 
@@ -246,7 +246,7 @@ def test_notion_writer_failure_isolated(
     tmp_path,
     audio_file,
 ):
-    from src.main import MeetingMind
+    from src.main import ContextRecall
 
     log_dir = tmp_path / "logs"
     log_dir.mkdir()
@@ -274,7 +274,7 @@ def test_notion_writer_failure_isolated(
         mock_notion_writer.write.side_effect = RuntimeError("Notion API down")
         mock_notion_cls.return_value = mock_notion_writer
 
-        app = MeetingMind(config_path=config_path)
+        app = ContextRecall(config_path=config_path)
         app._transcriber.transcribe.return_value = _make_transcript()
         app._summariser.summarise.return_value = _make_summary()
 
@@ -299,9 +299,9 @@ def test_audio_persistence_fallback_to_copy(
     tmp_config,
     tmp_path,
 ):
-    from src.main import MeetingMind
+    from src.main import ContextRecall
 
-    app = MeetingMind(config_path=tmp_config)
+    app = ContextRecall(config_path=tmp_config)
     app._transcriber.transcribe.return_value = _make_transcript()
     app._summariser.summarise.return_value = _make_summary()
 

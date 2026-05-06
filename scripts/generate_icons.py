@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 """
-Generate MeetingMind app icons in all required sizes.
+Generate Context Recall app icons in all required sizes.
 
 Design: indigo-to-violet gradient rounded square with a clean white
 microphone and two concentric sound-wave arcs. Simple, recognisable
@@ -19,8 +19,8 @@ from PIL import Image, ImageDraw
 ICON_DIR = Path(__file__).resolve().parent.parent / "ui" / "src-tauri" / "icons"
 
 # Colour palette.
-BG_TOP = (79, 70, 229)       # indigo-600
-BG_BOTTOM = (124, 58, 237)   # violet-600
+BG_TOP = (79, 70, 229)  # indigo-600
+BG_BOTTOM = (124, 58, 237)  # violet-600
 FG = (255, 255, 255)
 
 
@@ -29,7 +29,7 @@ def lerp_color(c1: tuple, c2: tuple, t: float) -> tuple:
 
 
 def draw_icon(size: int) -> Image.Image:
-    """Draw the MeetingMind icon at the given pixel size."""
+    """Draw the Context Recall icon at the given pixel size."""
     img = Image.new("RGBA", (size, size), (0, 0, 0, 0))
     draw = ImageDraw.Draw(img)
     s = size  # shorthand
@@ -50,11 +50,11 @@ def draw_icon(size: int) -> Image.Image:
     draw = ImageDraw.Draw(img)
 
     # --- Microphone (centred, vertically offset upward) ---
-    cx = s * 0.42          # slightly left of centre (waves go right)
+    cx = s * 0.42  # slightly left of centre (waves go right)
     mic_top = s * 0.20
     mic_bot = s * 0.48
-    mic_hw = s * 0.09      # half-width of capsule
-    cap_r = mic_hw          # rounded cap radius
+    mic_hw = s * 0.09  # half-width of capsule
+    cap_r = mic_hw  # rounded cap radius
 
     # Capsule body.
     draw.rounded_rectangle(
@@ -71,7 +71,8 @@ def draw_icon(size: int) -> Image.Image:
 
     draw.arc(
         [cx - cradle_hw, cradle_top, cx + cradle_hw, cradle_bot],
-        start=0, end=180,
+        start=0,
+        end=180,
         fill=(*FG, 255),
         width=lw,
     )
@@ -92,7 +93,8 @@ def draw_icon(size: int) -> Image.Image:
         r = s * r_mult
         draw.arc(
             [wave_cx - r, wave_cy - r, wave_cx + r, wave_cy + r],
-            start=-45, end=45,
+            start=-45,
+            end=45,
             fill=(*FG, alpha),
             width=max(2, int(s * 0.022)),
         )
@@ -156,7 +158,7 @@ def generate_all():
         append_images=ico_imgs[1:],
     )
     print("  icon.ico (Windows)")
-    print(f"\nDone — {ICON_DIR}")
+    print(f"\nDone - {ICON_DIR}")
 
 
 if __name__ == "__main__":

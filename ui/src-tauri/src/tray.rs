@@ -46,7 +46,7 @@ fn build_menu(
         MenuItem::with_id(handle, "start_recording", "Start Recording", true, None::<&str>)?
     };
     let sep2 = PredefinedMenuItem::separator(handle)?;
-    let open = MenuItem::with_id(handle, "open", "Open MeetingMind", true, None::<&str>)?;
+    let open = MenuItem::with_id(handle, "open", "Open Context Recall", true, None::<&str>)?;
     let prefs = MenuItem::with_id(
         handle,
         "preferences",
@@ -55,7 +55,7 @@ fn build_menu(
         None::<&str>,
     )?;
     let sep3 = PredefinedMenuItem::separator(handle)?;
-    let quit = MenuItem::with_id(handle, "quit", "Quit MeetingMind", true, None::<&str>)?;
+    let quit = MenuItem::with_id(handle, "quit", "Quit Context Recall", true, None::<&str>)?;
 
     Menu::with_items(
         handle,
@@ -68,7 +68,7 @@ pub fn setup(app: &tauri::App) -> tauri::Result<()> {
 
     TrayIconBuilder::with_id("main")
         .icon(app.default_window_icon().unwrap().clone())
-        .tooltip("MeetingMind")
+        .tooltip("Context Recall")
         .menu(&menu)
         .on_menu_event(|app_handle, event| match event.id.as_ref() {
             "open" => {
@@ -107,14 +107,14 @@ pub fn update_tray_state(
 
     // Tooltip.
     let tooltip = match state.as_str() {
-        "idle" => "MeetingMind \u{2014} Idle".to_string(),
-        "detecting" => "MeetingMind \u{2014} Detecting...".to_string(),
+        "idle" => "Context Recall \u{2014} Idle".to_string(),
+        "detecting" => "Context Recall \u{2014} Detecting...".to_string(),
         "recording" => match &meeting_title {
-            Some(t) => format!("MeetingMind \u{2014} Recording: {t}"),
-            None => "MeetingMind \u{2014} Recording".to_string(),
+            Some(t) => format!("Context Recall \u{2014} Recording: {t}"),
+            None => "Context Recall \u{2014} Recording".to_string(),
         },
-        "processing" => "MeetingMind \u{2014} Processing...".to_string(),
-        _ => "MeetingMind".to_string(),
+        "processing" => "Context Recall \u{2014} Processing...".to_string(),
+        _ => "Context Recall".to_string(),
     };
 
     // Menu status line.
@@ -123,7 +123,7 @@ pub fn update_tray_state(
         "detecting" => "Detecting meeting...",
         "recording" => "Recording in progress",
         "processing" => "Processing meeting...",
-        _ => "MeetingMind",
+        _ => "Context Recall",
     };
 
     // Icon colour per state.

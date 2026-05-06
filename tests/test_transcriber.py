@@ -221,7 +221,7 @@ class TestTranscriber:
             logprob_threshold=-0.5,
             no_speech_threshold=0.7,
             temperature=(0.0, 0.4, 0.8),
-            initial_prompt="MeetingMind standup",
+            initial_prompt="Context Recall standup",
         )
         transcriber = Transcriber(config)
         mock_transcribe.return_value = _make_mlx_result()
@@ -237,7 +237,7 @@ class TestTranscriber:
         assert kw["no_speech_threshold"] == 0.7
         assert kw["hallucination_silence_threshold"] is None
         assert kw["temperature"] == (0.0, 0.4, 0.8)
-        assert kw["initial_prompt"] == "MeetingMind standup"
+        assert kw["initial_prompt"] == "Context Recall standup"
         assert kw["verbose"] is False
 
     @patch("src.transcriber.mlx_whisper.transcribe")

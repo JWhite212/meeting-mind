@@ -26,13 +26,13 @@ jobs:
         run: pip install -r requirements.txt pyinstaller
 
       - name: Build daemon binary
-        run: pyinstaller meetingmind.spec --noconfirm
+        run: pyinstaller context-recall.spec --noconfirm
 
       - name: Upload daemon artifact
         uses: actions/upload-artifact@v4
         with:
-          name: meetingmind-daemon
-          path: dist/meetingmind-daemon/
+          name: context-recall-daemon
+          path: dist/context-recall-daemon/
 
   build-app:
     runs-on: macos-14
@@ -43,8 +43,8 @@ jobs:
       - name: Download daemon artifact
         uses: actions/download-artifact@v4
         with:
-          name: meetingmind-daemon
-          path: ui/src-tauri/resources/meetingmind-daemon
+          name: context-recall-daemon
+          path: ui/src-tauri/resources/context-recall-daemon
 
       - uses: actions/setup-node@v4
         with:

@@ -2,7 +2,7 @@
 
 > **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
 
-**Goal:** Add recurring meeting detection, analytics insights, action item tracking, meeting prep mode, and smart notifications to MeetingMind.
+**Goal:** Add recurring meeting detection, analytics insights, action item tracking, meeting prep mode, and smart notifications to Context Recall.
 
 **Architecture:** Extends existing pipeline with post-processing hooks, adds a lightweight asyncio scheduler for time-based triggers, and introduces a multi-channel notification dispatcher. All features share a single schema migration (v8 to v9) and degrade gracefully when dependencies are unavailable.
 
@@ -669,7 +669,7 @@ Routes: GET `/api/prep/upcoming`, GET `/api/prep/{meeting_id}`, POST `/api/prep/
 
 - [ ] **Step 1: Run full test suite** (`python3 -m pytest tests/ -v`)
 - [ ] **Step 2: Run linter** (`ruff check src/ tests/`)
-- [ ] **Step 3: Verify all imports** (`python3 -c "from src.main import MeetingMind; ..."`)
+- [ ] **Step 3: Verify all imports** (`python3 -c "from src.main import ContextRecall; ..."`)
 - [ ] **Step 4: Commit any fixes**
 
 ---

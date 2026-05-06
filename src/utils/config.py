@@ -1,5 +1,5 @@
 """
-Configuration loader for MeetingMind.
+Configuration loader for Context Recall.
 
 Reads config.yaml from the project root and exposes a typed
 configuration object. Falls back to sensible defaults where possible.
@@ -60,7 +60,7 @@ class AudioConfig:
     system_volume: float = 1.0  # System audio gain after normalisation (0.0–2.0).
     sample_rate: int = 16000
     channels: int = 1
-    temp_audio_dir: str = "~/Library/Caches/MeetingMind"
+    temp_audio_dir: str = "~/Library/Caches/Context Recall"
     keep_source_files: bool = False  # Keep separate source WAVs (for diarisation).
 
 
@@ -156,7 +156,7 @@ class DiarisationConfig:
 @dataclass
 class LoggingConfig:
     level: str = "INFO"
-    log_file: str = "~/Library/Logs/meetingmind.log"
+    log_file: str = "~/Library/Logs/Context Recall/contextrecall.log"
 
 
 @dataclass

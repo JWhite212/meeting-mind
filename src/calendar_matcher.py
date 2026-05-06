@@ -14,7 +14,7 @@ import threading
 from dataclasses import dataclass, field
 from urllib.parse import unquote
 
-logger = logging.getLogger("meetingmind.calendar")
+logger = logging.getLogger("contextrecall.calendar")
 
 # Teams meeting URL pattern.
 TEAMS_URL_PATTERN = re.compile(

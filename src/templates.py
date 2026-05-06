@@ -1,5 +1,5 @@
 """
-Summary template system for MeetingMind.
+Summary template system for Context Recall.
 
 Allows users to define different summarisation prompts for different
 meeting types (standup, retro, 1-on-1, client call, etc.).  Templates
@@ -14,6 +14,8 @@ from dataclasses import dataclass, field
 from pathlib import Path
 
 import yaml
+
+from src.utils.paths import templates_dir as _default_templates_dir
 
 _SAFE_NAME_RE = re.compile(r"^[a-zA-Z0-9_\-]+$")
 
@@ -127,7 +129,7 @@ SUMMARISATION_PROMPT = (
     'e.g. "project-x, roadmap, hiring"}\n'
 )
 
-_DEFAULT_TEMPLATES_DIR = Path("~/.config/meetingmind/templates").expanduser()
+_DEFAULT_TEMPLATES_DIR = _default_templates_dir()
 
 
 @dataclass

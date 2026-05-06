@@ -1,5 +1,5 @@
 """
-FastAPI server for MeetingMind.
+FastAPI server for Context Recall.
 
 Runs on a background thread alongside the existing detector loop,
 providing a REST + WebSocket interface for the UI.
@@ -35,7 +35,7 @@ from src.db.repository import MeetingRepository
 from src.embeddings import Embedder, is_embeddings_available
 from src.utils.config import DEFAULT_CONFIG_PATH, load_config
 
-logger = logging.getLogger("meetingmind.api")
+logger = logging.getLogger("contextrecall.api")
 
 
 class ApiServer:
@@ -60,11 +60,11 @@ class ApiServer:
         self._server: uvicorn.Server | None = None
         self._retention_task: asyncio.Task | None = None
 
-        # State accessors (set by MeetingMind before start).
+        # State accessors (set by Context Recall before start).
         self._get_daemon_state = lambda: "idle"
         self._get_active_meeting = lambda: None
 
-        # Recording controls (set by MeetingMind before start).
+        # Recording controls (set by Context Recall before start).
         self._start_recording = None
         self._stop_recording = None
         self._stop_recording_deferred = None
@@ -82,9 +82,9 @@ class ApiServer:
 
     def _create_app(self) -> FastAPI:
         app = FastAPI(
-            title="MeetingMind API",
+            title="Context Recall API",
             description=(
-                "REST + WebSocket API for the MeetingMind daemon. "
+                "REST + WebSocket API for the Context Recall daemon. "
                 "Provides meeting history, live recording controls, configuration, "
                 "model management, and real-time events."
             ),
@@ -410,7 +410,7 @@ class ApiServer:
         """Start the API server on a background daemon thread."""
         self._thread = threading.Thread(
             target=self._thread_target,
-            name="meetingmind-api",
+            name="contextrecall-api",
             daemon=True,
         )
         self._thread.start()

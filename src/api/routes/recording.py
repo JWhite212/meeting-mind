@@ -13,7 +13,7 @@ from fastapi import APIRouter, HTTPException
 
 from src.api.schemas import RecordStartResponse, RecordStopResponse
 
-logger = logging.getLogger("meetingmind.api.recording")
+logger = logging.getLogger("contextrecall.api.recording")
 
 router = APIRouter()
 

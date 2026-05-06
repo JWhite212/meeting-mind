@@ -6,7 +6,7 @@ import uuid
 
 from src.db.database import Database
 
-logger = logging.getLogger("meetingmind.notifications.repo")
+logger = logging.getLogger("contextrecall.notifications.repo")
 
 
 class NotificationRepository:

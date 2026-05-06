@@ -19,7 +19,7 @@ import numpy as np
 
 from src.transcriber import TranscriptSegment
 
-logger = logging.getLogger("meetingmind.live")
+logger = logging.getLogger("contextrecall.live")
 
 
 @dataclass

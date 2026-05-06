@@ -1,1 +1,1 @@
-"""Notification system for MeetingMind."""
+"""Notification system for Context Recall."""

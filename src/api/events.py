@@ -1,5 +1,5 @@
 """
-EventBus — central event dispatch for MeetingMind.
+EventBus - central event dispatch for Context Recall.
 
 Bridges synchronous pipeline threads to async WebSocket clients.
 Pipeline stages emit typed event dicts; the EventBus fans them out to:
@@ -14,7 +14,7 @@ import threading
 import time
 from typing import Any, Callable
 
-logger = logging.getLogger("meetingmind.events")
+logger = logging.getLogger("contextrecall.events")
 
 # Type alias for event payloads.
 Event = dict[str, Any]
@@ -59,15 +59,11 @@ class EventBus:
 
     def unsubscribe_sync(self, callback: SyncCallback) -> None:
         with self._lock:
-            self._sync_callbacks = [
-                cb for cb in self._sync_callbacks if cb is not callback
-            ]
+            self._sync_callbacks = [cb for cb in self._sync_callbacks if cb is not callback]
 
     def unsubscribe_async(self, callback: AsyncCallback) -> None:
         with self._lock:
-            self._async_callbacks = [
-                cb for cb in self._async_callbacks if cb is not callback
-            ]
+            self._async_callbacks = [cb for cb in self._async_callbacks if cb is not callback]
 
     def emit(self, event: Event) -> None:
         """Emit an event to all subscribers. Thread-safe.

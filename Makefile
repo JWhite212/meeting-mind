@@ -1,13 +1,13 @@
-# MeetingMind — Build & Install Automation
+# Context Recall - Build and Install Automation
 #
 # Targets:
-#   make setup       — Create venv, install Python and UI dependencies
-#   make build       — Build daemon binary, copy resources, build Tauri app
-#   make install     — Build everything, then install the launch agent
-#   make dev         — Start the Tauri dev server with hot-reload
-#   make test        — Run the Python test suite
-#   make lint        — Run ruff linter on src/ and tests/
-#   make clean       — Remove all build artefacts
+#   make setup       - Create venv, install Python and UI dependencies
+#   make build       - Build daemon binary, copy resources, build Tauri app
+#   make install     - Build everything, then install the launch agent
+#   make dev         - Start the Tauri dev server with hot-reload
+#   make test        - Run the Python test suite
+#   make lint        - Run ruff linter on src/ and tests/
+#   make clean       - Remove all build artefacts
 
 .PHONY: setup build-daemon copy-daemon build-app build install dev test lint clean
 
@@ -24,8 +24,8 @@ build-daemon:
 
 copy-daemon:
 	@echo "==> Copying daemon to Tauri resources"
-	mkdir -p ui/src-tauri/resources/meetingmind-daemon
-	cp -R dist/meetingmind-daemon/ ui/src-tauri/resources/meetingmind-daemon/
+	mkdir -p ui/src-tauri/resources/context-recall-daemon
+	cp -R dist/context-recall-daemon/ ui/src-tauri/resources/context-recall-daemon/
 
 build-app:
 	cd ui && npm run tauri build

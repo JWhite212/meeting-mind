@@ -14,8 +14,8 @@ WIDTH = 660
 HEIGHT = 400
 
 # Indigo gradient colours (OKLCH-inspired, hand-picked sRGB).
-TOP_COLOR = (55, 48, 107)       # Deep indigo
-BOTTOM_COLOR = (99, 89, 168)    # Lighter indigo
+TOP_COLOR = (55, 48, 107)  # Deep indigo
+BOTTOM_COLOR = (99, 89, 168)  # Lighter indigo
 
 
 def _gradient(draw: ImageDraw.ImageDraw) -> None:
@@ -62,7 +62,7 @@ def _labels(draw: ImageDraw.ImageDraw) -> None:
     # Left label (app icon area).
     draw.text(
         (WIDTH // 2 - 140, HEIGHT // 2 + 40),
-        "MeetingMind",
+        "Context Recall",
         fill=(255, 255, 255, 220),
         font=font,
         anchor="mt",

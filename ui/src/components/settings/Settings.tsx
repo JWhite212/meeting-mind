@@ -1836,7 +1836,7 @@ export function Settings() {
       </Section>
 
       <Section id="about" title="About">
-        <InfoRow label="App" value="MeetingMind" />
+        <InfoRow label="App" value="Context Recall" />
         <InfoRow label="Version" value="0.1.0" />
         <InfoRow label="Platform" value="macOS (Tauri)" />
         <UpdateChecker />

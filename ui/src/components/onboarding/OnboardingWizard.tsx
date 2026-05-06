@@ -4,7 +4,7 @@ import { getDevices, getModels, downloadModel, getConfig } from "../../lib/api";
 import { Spinner } from "../common/Spinner";
 import type { WhisperModel } from "../../lib/types";
 
-const STORAGE_KEY = "meetingmind-onboarding-complete";
+const STORAGE_KEY = "contextrecall-onboarding-complete";
 
 export function isOnboardingComplete(): boolean {
   return localStorage.getItem(STORAGE_KEY) === "true";
@@ -95,7 +95,7 @@ export function OnboardingWizard({ onComplete }: OnboardingWizardProps) {
               onClick={finish}
               className="px-6 py-2 text-sm font-medium rounded-lg bg-accent text-white hover:bg-accent-hover transition-colors"
             >
-              Start MeetingMind
+              Start Context Recall
             </button>
           ) : (
             <button
@@ -119,7 +119,17 @@ function WelcomeStep() {
   return (
     <div className="text-center">
       <div className="text-4xl mb-4">
-        <svg width="48" height="48" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" className="text-accent mx-auto">
+        <svg
+          width="48"
+          height="48"
+          viewBox="0 0 24 24"
+          fill="none"
+          stroke="currentColor"
+          strokeWidth="1.5"
+          strokeLinecap="round"
+          strokeLinejoin="round"
+          className="text-accent mx-auto"
+        >
           <path d="M12 1a3 3 0 0 0-3 3v8a3 3 0 0 0 6 0V4a3 3 0 0 0-3-3z" />
           <path d="M19 10v2a7 7 0 0 1-14 0v-2" />
           <line x1="12" y1="19" x2="12" y2="23" />
@@ -127,10 +137,10 @@ function WelcomeStep() {
         </svg>
       </div>
       <h1 className="text-2xl font-semibold text-text-primary mb-3">
-        Welcome to MeetingMind
+        Welcome to Context Recall
       </h1>
       <p className="text-sm text-text-secondary max-w-md mx-auto leading-relaxed">
-        MeetingMind automatically detects your Teams meetings, records audio,
+        Context Recall automatically detects your Teams meetings, records audio,
         transcribes locally using Whisper, and produces AI-powered summaries.
       </p>
       <p className="text-xs text-text-muted mt-4 max-w-sm mx-auto">
@@ -157,13 +167,16 @@ function AudioStep() {
         Audio Setup
       </h2>
       <p className="text-sm text-text-secondary mb-6">
-        MeetingMind uses BlackHole to capture system audio. Check that it's installed and visible.
+        Context Recall uses BlackHole to capture system audio. Check that it's
+        installed and visible.
       </p>
 
       {isLoading ? (
         <div className="flex items-center gap-2 py-4">
           <Spinner />
-          <span className="text-sm text-text-muted">Checking audio devices...</span>
+          <span className="text-sm text-text-muted">
+            Checking audio devices...
+          </span>
         </div>
       ) : (
         <>
@@ -174,9 +187,7 @@ function AudioStep() {
               }`}
             />
             <span className="text-sm text-text-primary">
-              {hasBlackHole
-                ? "BlackHole detected"
-                : "BlackHole not found"}
+              {hasBlackHole ? "BlackHole detected" : "BlackHole not found"}
             </span>
           </div>
 
@@ -184,14 +195,18 @@ function AudioStep() {
             <div className="rounded-lg bg-status-error/5 border border-status-error/20 p-4 mb-4">
               <p className="text-xs text-text-secondary">
                 Install BlackHole from{" "}
-                <span className="font-mono text-accent">existential.audio/blackhole</span>,
-                then set up a Multi-Output Device in Audio MIDI Setup.
+                <span className="font-mono text-accent">
+                  existential.audio/blackhole
+                </span>
+                , then set up a Multi-Output Device in Audio MIDI Setup.
               </p>
             </div>
           )}
 
           <div className="rounded-lg bg-surface border border-border p-3 max-h-40 overflow-y-auto">
-            <p className="text-xs text-text-muted mb-2">Detected audio devices:</p>
+            <p className="text-xs text-text-muted mb-2">
+              Detected audio devices:
+            </p>
             {devices.map((d) => (
               <div key={d.index} className="text-xs text-text-secondary py-0.5">
                 {d.name}
@@ -213,7 +228,9 @@ function TranscriptionStep() {
     queryFn: getModels,
     refetchInterval: (query) => {
       const models = query.state.data?.models ?? [];
-      return models.some((m: WhisperModel) => m.status === "downloading") ? 3000 : false;
+      return models.some((m: WhisperModel) => m.status === "downloading")
+        ? 3000
+        : false;
     },
   });
 
@@ -229,7 +246,8 @@ function TranscriptionStep() {
         Transcription Model
       </h2>
       <p className="text-sm text-text-secondary mb-6">
-        Download a Whisper model for local speech-to-text. Larger models are more accurate but slower.
+        Download a Whisper model for local speech-to-text. Larger models are
+        more accurate but slower.
       </p>
 
       {isLoading ? (
@@ -246,7 +264,9 @@ function TranscriptionStep() {
             >
               <div>
                 <span className="text-sm text-text-primary">{m.name}</span>
-                <span className="text-xs text-text-muted ml-2">{m.size_mb} MB</span>
+                <span className="text-xs text-text-muted ml-2">
+                  {m.size_mb} MB
+                </span>
               </div>
               {m.status === "downloaded" ? (
                 <span className="text-xs text-status-idle">Ready</span>
@@ -284,7 +304,8 @@ function SummarisationStep() {
         Summarisation
       </h2>
       <p className="text-sm text-text-secondary mb-6">
-        Choose how meeting summaries are generated. You can change this later in Settings.
+        Choose how meeting summaries are generated. You can change this later in
+        Settings.
       </p>
 
       <div className="flex flex-col gap-3">
@@ -295,9 +316,12 @@ function SummarisationStep() {
               : "border-border bg-surface"
           }`}
         >
-          <div className="text-sm font-medium text-text-primary">Ollama (Local)</div>
+          <div className="text-sm font-medium text-text-primary">
+            Ollama (Local)
+          </div>
           <p className="text-xs text-text-muted mt-1">
-            Free, runs on your machine. Requires Ollama installed with a model like llama3.1.
+            Free, runs on your machine. Requires Ollama installed with a model
+            like llama3.1.
           </p>
         </div>
 
@@ -308,7 +332,9 @@ function SummarisationStep() {
               : "border-border bg-surface"
           }`}
         >
-          <div className="text-sm font-medium text-text-primary">Claude (API)</div>
+          <div className="text-sm font-medium text-text-primary">
+            Claude (API)
+          </div>
           <p className="text-xs text-text-muted mt-1">
             Higher quality summaries via the Anthropic API. Requires an API key.
           </p>
@@ -316,7 +342,8 @@ function SummarisationStep() {
       </div>
 
       <p className="text-xs text-text-muted mt-4">
-        Current backend: <span className="font-medium text-text-secondary">{backend}</span>.
+        Current backend:{" "}
+        <span className="font-medium text-text-secondary">{backend}</span>.
         Change it in Settings after setup.
       </p>
     </div>
@@ -331,11 +358,10 @@ function OutputStep() {
 
   return (
     <div>
-      <h2 className="text-xl font-semibold text-text-primary mb-2">
-        Output
-      </h2>
+      <h2 className="text-xl font-semibold text-text-primary mb-2">Output</h2>
       <p className="text-sm text-text-secondary mb-6">
-        Summaries can be written to an Obsidian vault and/or Notion. Configure these in Settings.
+        Summaries can be written to an Obsidian vault and/or Notion. Configure
+        these in Settings.
       </p>
 
       <div className="flex flex-col gap-3">
@@ -377,7 +403,17 @@ function DoneStep() {
   return (
     <div className="text-center">
       <div className="mb-4">
-        <svg width="48" height="48" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" className="text-status-idle mx-auto">
+        <svg
+          width="48"
+          height="48"
+          viewBox="0 0 24 24"
+          fill="none"
+          stroke="currentColor"
+          strokeWidth="1.5"
+          strokeLinecap="round"
+          strokeLinejoin="round"
+          className="text-status-idle mx-auto"
+        >
           <path d="M22 11.08V12a10 10 0 1 1-5.93-9.14" />
           <polyline points="22 4 12 14.01 9 11.01" />
         </svg>
@@ -386,8 +422,8 @@ function DoneStep() {
         You're all set
       </h2>
       <p className="text-sm text-text-secondary max-w-sm mx-auto">
-        MeetingMind will automatically detect and transcribe your Teams meetings.
-        You can fine-tune everything in Settings.
+        Context Recall will automatically detect and transcribe your Teams
+        meetings. You can fine-tune everything in Settings.
       </p>
     </div>
   );

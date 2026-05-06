@@ -1,4 +1,4 @@
-# MeetingMind Configuration
+# Context Recall Configuration
 # Copy to config.yaml and fill in your values.
 
 # --- Meeting Detection ---
@@ -54,7 +54,7 @@ audio:
   channels: 1
 
   # Temporary directory for raw audio chunks during recording.
-  temp_audio_dir: "/tmp/meetingmind"
+  temp_audio_dir: "~/Library/Application Support/Context Recall/audio"
 
   # Keep separate source WAV files (system + mic) after merging.
   # Required for speaker diarisation. If false, temp files are deleted.
@@ -138,7 +138,7 @@ summarisation:
   chunk_threshold_words: 20000
 
   # Default summary template. Built-in options: standard, standup, retro, 1on1, client-call.
-  # Custom templates can be added in ~/.config/meetingmind/templates/
+  # Custom templates can be added in ~/Library/Application Support/Context Recall/templates/
   default_template: "standard"
 
 # --- Speaker Diarisation ---
@@ -214,7 +214,7 @@ notion:
 # --- Logging ---
 logging:
   level: "INFO"  # DEBUG, INFO, WARNING, ERROR
-  log_file: "~/Library/Logs/meetingmind.log"
+  log_file: "~/Library/Logs/Context Recall/contextrecall.log"
 
 # --- API Server ---
 # The UI connects to this server for real-time status and meeting history.

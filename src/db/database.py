@@ -1,24 +1,25 @@
 """
-SQLite database manager for MeetingMind.
+SQLite database manager for Context Recall.
 
 Handles schema creation, migrations, and provides an async connection
 interface via aiosqlite. The database stores meeting history, transcripts,
 and summaries for the UI to query.
 
-Location: ~/.local/share/meetingmind/meetings.db
+Location: ~/Library/Application Support/Context Recall/meetings.db
 """
 
 import logging
-import os
 from pathlib import Path
 
 import aiosqlite
 
-logger = logging.getLogger("meetingmind.db")
+from src.utils.paths import app_support_dir, db_path
 
-# XDG-style data directory (works on macOS and Linux).
-DEFAULT_DB_DIR = Path(os.path.expanduser("~/.local/share/meetingmind"))
-DEFAULT_DB_PATH = DEFAULT_DB_DIR / "meetings.db"
+logger = logging.getLogger("contextrecall.db")
+
+# macOS-native data directory (Application Support).
+DEFAULT_DB_DIR = app_support_dir()
+DEFAULT_DB_PATH = db_path()
 
 SCHEMA_VERSION = 9
 

@@ -1,5 +1,5 @@
 """
-Authentication for the MeetingMind API.
+Authentication for the Context Recall API.
 
 Generates a shared secret token on first run and validates it
 on incoming requests. Since the API binds to 127.0.0.1 only,
@@ -8,16 +8,16 @@ this prevents other local applications from controlling the daemon.
 
 import hmac
 import logging
-import os
 import secrets
-from pathlib import Path
 
 from fastapi import HTTPException, Request
 
-logger = logging.getLogger("meetingmind.auth")
+from src.utils.paths import app_support_dir, auth_token_path
 
-TOKEN_DIR = Path(os.path.expanduser("~/.config/meetingmind"))
-TOKEN_PATH = TOKEN_DIR / "auth_token"
+logger = logging.getLogger("contextrecall.auth")
+
+TOKEN_DIR = app_support_dir()
+TOKEN_PATH = auth_token_path()
 
 
 def get_or_create_token() -> str:

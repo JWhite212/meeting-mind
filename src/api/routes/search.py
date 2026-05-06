@@ -14,7 +14,7 @@ from pydantic import BaseModel, Field
 
 from src.utils.temporal import parse_temporal
 
-logger = logging.getLogger("meetingmind.api.search")
+logger = logging.getLogger("contextrecall.api.search")
 
 router = APIRouter()
 

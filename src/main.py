@@ -1,5 +1,5 @@
 """
-MeetingMind — main entry point and orchestrator.
+Context Recall - main entry point and orchestrator.
 
 Wires together the detector, audio capture, transcriber, summariser,
 and output writers into a cohesive pipeline. Can run as:
@@ -39,6 +39,7 @@ from src.summariser import Summariser
 from src.templates import TemplateManager
 from src.transcriber import Transcriber
 from src.utils.config import load_config
+from src.utils.paths import audio_dir as default_audio_dir
 
 try:
     from src.calendar_matcher import CalendarMatch, CalendarMatcher
@@ -46,10 +47,10 @@ except ImportError:
     CalendarMatcher = None
     CalendarMatch = None
 
-logger = logging.getLogger("meetingmind")
+logger = logging.getLogger("contextrecall")
 
 
-class MeetingMind:
+class ContextRecall:
     """
     Top-level orchestrator. Connects the detector's callbacks to
     the recording pipeline and manages the lifecycle of each
@@ -309,7 +310,7 @@ class MeetingMind:
         """
         persistent_audio_path = audio_path
         if self._api_server and self._api_server.repo:
-            audio_dir = Path(os.path.expanduser("~/Library/Application Support/MeetingMind/audio"))
+            audio_dir = default_audio_dir()
             audio_dir.mkdir(parents=True, exist_ok=True)
             persistent_audio_path = (audio_dir / audio_path.name).resolve()
             if not str(persistent_audio_path).startswith(str(audio_dir.resolve())):
@@ -779,7 +780,7 @@ class MeetingMind:
         Run as a background daemon, polling for Teams meetings.
         Blocks until interrupted with SIGINT/SIGTERM.
         """
-        logger.info("MeetingMind daemon starting...")
+        logger.info("Context Recall daemon starting...")
 
         # Start the API server for UI communication.
         self._start_api_server()
@@ -872,7 +873,7 @@ class MeetingMind:
 
 def main():
     parser = argparse.ArgumentParser(
-        description="MeetingMind: auto-detect, transcribe, and summarise Teams meetings.",
+        description="Context Recall: auto-detect, transcribe, and summarise Teams meetings.",
     )
     parser.add_argument(
         "--config",
@@ -895,7 +896,7 @@ def main():
     args = parser.parse_args()
     config_path = Path(args.config) if args.config else None
 
-    app = MeetingMind(config_path)
+    app = ContextRecall(config_path)
 
     try:
         if args.process:

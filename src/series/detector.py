@@ -9,7 +9,7 @@ from src.db.repository import MeetingRepository
 from src.series.repository import SeriesRepository
 from src.utils.config import SeriesConfig
 
-logger = logging.getLogger("meetingmind.series.detector")
+logger = logging.getLogger("contextrecall.series.detector")
 
 
 class HeuristicSeriesDetector:
