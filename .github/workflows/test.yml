@@ -108,6 +108,17 @@ jobs:
             ui/src-tauri/target
           key: ${{ runner.os }}-cargo-${{ hashFiles('ui/src-tauri/Cargo.lock') }}
 
+      # tauri.conf.json declares `resources/context-recall-daemon` as a
+      # bundle resource. The directory is gitignored (it's populated by
+      # `make build-daemon && make copy-daemon`), so the Tauri build
+      # script fails the resource-existence check on a fresh checkout.
+      # rust-check only validates that Rust compiles, not that the
+      # daemon binary is real, so a stub directory is sufficient here.
+      - name: Stub daemon resource directory for cargo check
+        run: |
+          mkdir -p ui/src-tauri/resources/context-recall-daemon
+          touch ui/src-tauri/resources/context-recall-daemon/.gitkeep
+
       - name: cargo check
         run: cd ui/src-tauri && cargo check
 

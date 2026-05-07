@@ -89,11 +89,15 @@ markupsafe==3.0.3
     # via jinja2
 mdurl==0.1.2
     # via markdown-it-py
-mlx==0.31.2
-    # via mlx-whisper
-mlx-metal==0.31.2
-    # via mlx
-mlx-whisper==0.4.3
+mlx==0.31.2 ; sys_platform == "darwin" and platform_machine == "arm64"
+    # via
+    #   -r requirements.in
+    #   mlx-whisper
+mlx-metal==0.31.2 ; sys_platform == "darwin" and platform_machine == "arm64"
+    # via
+    #   -r requirements.in
+    #   mlx
+mlx-whisper==0.4.3 ; sys_platform == "darwin" and platform_machine == "arm64"
     # via -r requirements.in
 more-itertools==11.0.2
     # via mlx-whisper
