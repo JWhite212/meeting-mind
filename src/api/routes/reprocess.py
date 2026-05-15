@@ -80,15 +80,22 @@ def _run_pipeline(
     trans_config: TranscriptionConfig,
     summ_config: SummarisationConfig,
 ) -> dict:
-    """Run transcribe → summarise on a background thread. Returns result dict."""
+    """Run transcribe → summarise on a background thread. Returns result dict.
+
+    Mirrors src/main.py:_process_audio for the empty/short transcript cases
+    (Bug B1): an empty transcript is a real capture failure and is raised;
+    a short-but-non-empty transcript is a real (brief) meeting and is
+    returned with summary=None so the caller can preserve the transcript
+    without producing garbage summarisation output.
+    """
     transcriber = Transcriber(trans_config)
     transcript = transcriber.transcribe(audio_path)
 
+    if not transcript.segments:
+        raise ValueError("Transcript is empty. The audio may be silent or corrupted.")
+
     if transcript.word_count < 5:
-        raise ValueError(
-            f"Transcript too short ({transcript.word_count} words). "
-            f"The audio may be silent or corrupted."
-        )
+        return {"transcript": transcript, "summary": None}
 
     template = None
     try:
@@ -147,18 +154,34 @@ async def _do_reprocess(
         summary = result["summary"]
 
         try:
-            await _repo.update_meeting(
-                meeting_id,
-                title=summary.title,
-                ended_at=started_at + transcript.duration_seconds,
-                duration_seconds=transcript.duration_seconds,
-                status="complete",
-                transcript_json=json.dumps(transcript.to_dict()),
-                summary_markdown=summary.raw_markdown,
-                tags=summary.tags,
-                language=transcript.language,
-                word_count=transcript.word_count,
-            )
+            if summary is None:
+                # Bug B1 unification: short-but-non-empty transcript. Preserve
+                # what we got and mark complete; no summary to write.
+                title = "Untitled Meeting (short)"
+                await _repo.update_meeting(
+                    meeting_id,
+                    title=title,
+                    ended_at=started_at + transcript.duration_seconds,
+                    duration_seconds=transcript.duration_seconds,
+                    status="complete",
+                    transcript_json=json.dumps(transcript.to_dict()),
+                    language=transcript.language,
+                    word_count=transcript.word_count,
+                )
+            else:
+                title = summary.title
+                await _repo.update_meeting(
+                    meeting_id,
+                    title=title,
+                    ended_at=started_at + transcript.duration_seconds,
+                    duration_seconds=transcript.duration_seconds,
+                    status="complete",
+                    transcript_json=json.dumps(transcript.to_dict()),
+                    summary_markdown=summary.raw_markdown,
+                    tags=summary.tags,
+                    language=transcript.language,
+                    word_count=transcript.word_count,
+                )
             await _repo.update_fts(meeting_id)
         except Exception:
             logger.error(
@@ -176,8 +199,8 @@ async def _do_reprocess(
             )
             return
 
-        logger.info("Reprocessing complete: '%s'", summary.title)
-        _emit({"type": "pipeline.complete", "meeting_id": meeting_id, "title": summary.title})
+        logger.info("Reprocessing complete: '%s'", title)
+        _emit({"type": "pipeline.complete", "meeting_id": meeting_id, "title": title})
     finally:
         _in_flight.discard(meeting_id)
 

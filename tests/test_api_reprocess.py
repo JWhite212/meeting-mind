@@ -72,6 +72,21 @@ def _make_transcript():
     )
 
 
+def _make_short_transcript():
+    """A real-but-short transcript (under the < 5 word threshold)."""
+    return Transcript(
+        segments=[TranscriptSegment(start=0.0, end=2.0, text="hi bye")],
+        language="en",
+        language_probability=0.99,
+        duration_seconds=2.0,
+    )
+
+
+def _make_empty_transcript():
+    """An empty transcript — what comes back when capture produced silence."""
+    return Transcript(segments=[], language="en", language_probability=0.0, duration_seconds=0.0)
+
+
 def _make_summary():
     return MeetingSummary(
         raw_markdown="# Test\n\n## Summary\nA test meeting.",
@@ -238,6 +253,155 @@ def test_background_task_marks_meeting_error_on_pipeline_failure(tmp_path):
     ]
     assert "error" in statuses, f"pipeline failure must mark the meeting 'error'; got {statuses}"
     assert "m1" not in reprocess_routes._in_flight
+
+
+# ---------------------------------------------------------------------------
+# Bug B1 unification: reprocess must mirror the orchestrator's contract for
+# short-but-non-empty transcripts — preserve them and mark 'complete' rather
+# than raising. The orchestrator was fixed in commit 4847c5d; reprocess was
+# deliberately left out of that commit to limit blast radius. This is the
+# follow-up that closes the asymmetry: clicking "Retry Transcription" on a
+# 2-word meeting now produces the same outcome as the auto-detect path.
+# ---------------------------------------------------------------------------
+
+
+def test_short_transcript_marks_meeting_complete_not_error(tmp_path):
+    """A short-but-non-empty transcript (e.g. "hi bye") must be preserved
+    and the meeting marked 'complete'. Previously _run_pipeline raised
+    ValueError on word_count < 5, which the caller mapped to status='error'
+    — losing the real transcript the user actually had captured."""
+    audio_file = tmp_path / "x.wav"
+    audio_file.write_bytes(b"\x00" * 100)
+
+    repo = MagicMock()
+    repo.get_meeting = AsyncMock(return_value=_make_meeting(audio_path=str(audio_file)))
+    repo.update_meeting = AsyncMock()
+    repo.update_fts = AsyncMock()
+
+    mock_transcriber = MagicMock()
+    mock_transcriber.transcribe.return_value = _make_short_transcript()
+
+    app = _make_app(repo)
+    with TestClient(app) as c:
+        with patch("src.api.routes.reprocess.Transcriber", return_value=mock_transcriber):
+            with patch(
+                "src.api.routes.reprocess._load_config_sections",
+                return_value=(MagicMock(), MagicMock()),
+            ):
+                resp = c.post("/api/meetings/m1/reprocess", headers=_auth_headers())
+                assert resp.status_code == 202
+
+                deadline = time.monotonic() + 2.0
+                while "m1" in reprocess_routes._in_flight and time.monotonic() < deadline:
+                    time.sleep(0.05)
+
+    statuses = [
+        call.kwargs.get("status")
+        for call in repo.update_meeting.await_args_list
+        if "status" in call.kwargs
+    ]
+
+    # The meeting MUST NOT be flagged 'error' just for being short — that
+    # conflates "no audio at all" with "very short conversation".
+    assert "error" not in statuses, (
+        "short-but-non-empty transcripts must not be flagged 'error' on "
+        f"reprocess; got status sequence {statuses}"
+    )
+    assert "complete" in statuses, (
+        "short transcript must be marked 'complete' so the user can see "
+        f"what was captured; got status sequence {statuses}"
+    )
+
+    # The transcript itself must be persisted so the user can review it.
+    transcript_calls = [
+        call for call in repo.update_meeting.await_args_list if "transcript_json" in call.kwargs
+    ]
+    assert transcript_calls, (
+        "transcript_json must be persisted for short transcripts so the "
+        "user can review the captured content"
+    )
+
+
+def test_short_transcript_emits_pipeline_complete_not_error(tmp_path):
+    """The UI's pipelineStage clears on pipeline.complete and rolls back to
+    an alert on pipeline.error. Short transcripts must take the .complete
+    path so the user doesn't see a misleading red banner for what was a
+    successful (if brief) reprocess."""
+    audio_file = tmp_path / "x.wav"
+    audio_file.write_bytes(b"\x00" * 100)
+
+    repo = MagicMock()
+    repo.get_meeting = AsyncMock(return_value=_make_meeting(audio_path=str(audio_file)))
+    repo.update_meeting = AsyncMock()
+    repo.update_fts = AsyncMock()
+
+    mock_transcriber = MagicMock()
+    mock_transcriber.transcribe.return_value = _make_short_transcript()
+
+    event_bus = MagicMock()
+
+    app = _make_app(repo, event_bus=event_bus)
+    with TestClient(app) as c:
+        with patch("src.api.routes.reprocess.Transcriber", return_value=mock_transcriber):
+            with patch(
+                "src.api.routes.reprocess._load_config_sections",
+                return_value=(MagicMock(), MagicMock()),
+            ):
+                resp = c.post("/api/meetings/m1/reprocess", headers=_auth_headers())
+                assert resp.status_code == 202
+
+                deadline = time.monotonic() + 2.0
+                while "m1" in reprocess_routes._in_flight and time.monotonic() < deadline:
+                    time.sleep(0.05)
+
+    emitted_types = [
+        call.args[0].get("type")
+        for call in event_bus.emit.call_args_list
+        if call.args and isinstance(call.args[0], dict)
+    ]
+    assert "pipeline.complete" in emitted_types, (
+        f"short transcript must emit pipeline.complete; got {emitted_types}"
+    )
+    assert "pipeline.error" not in emitted_types, (
+        f"short transcript must not emit pipeline.error; got {emitted_types}"
+    )
+
+
+def test_empty_transcript_still_marks_meeting_error(tmp_path):
+    """Counterpart: a truly empty transcript (no segments) is a real
+    failure — capture produced silence or corrupted audio. The meeting
+    must still be flagged 'error' in that case, mirroring the
+    orchestrator's empty-transcript branch."""
+    audio_file = tmp_path / "x.wav"
+    audio_file.write_bytes(b"\x00" * 100)
+
+    repo = MagicMock()
+    repo.get_meeting = AsyncMock(return_value=_make_meeting(audio_path=str(audio_file)))
+    repo.update_meeting = AsyncMock()
+
+    mock_transcriber = MagicMock()
+    mock_transcriber.transcribe.return_value = _make_empty_transcript()
+
+    app = _make_app(repo)
+    with TestClient(app) as c:
+        with patch("src.api.routes.reprocess.Transcriber", return_value=mock_transcriber):
+            with patch(
+                "src.api.routes.reprocess._load_config_sections",
+                return_value=(MagicMock(), MagicMock()),
+            ):
+                resp = c.post("/api/meetings/m1/reprocess", headers=_auth_headers())
+                assert resp.status_code == 202
+
+                deadline = time.monotonic() + 2.0
+                while "m1" in reprocess_routes._in_flight and time.monotonic() < deadline:
+                    time.sleep(0.05)
+
+    statuses = [
+        call.kwargs.get("status")
+        for call in repo.update_meeting.await_args_list
+        if "status" in call.kwargs
+    ]
+    assert "error" in statuses, f"empty transcript must mark meeting 'error'; got {statuses}"
 
 
 def test_background_task_emits_pipeline_complete_event(tmp_path):
