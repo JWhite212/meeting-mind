@@ -74,6 +74,13 @@ class AudioCapture:
         # silently waiting on a 120s merge timeout.
         self._last_error: AudioCaptureError | None = None
 
+        # Last non-fatal capture warning (e.g. mic device not found, no
+        # default mic available). The orchestrator emits a pipeline.warning
+        # event for it so the user sees an actionable hint instead of
+        # discovering the silent system-only fallback from a missing voice
+        # in the transcript.
+        self._last_warning: str | None = None
+
         # Ensure the temp directory exists with owner-only permissions.
         os.makedirs(config.temp_audio_dir, exist_ok=True)
         os.chmod(config.temp_audio_dir, 0o700)
@@ -468,6 +475,10 @@ class AudioCapture:
                 self._config.blackhole_device_name, kind="BlackHole"
             )
 
+            # Reset session-scoped diagnostics so the orchestrator only
+            # sees warnings/errors from THIS recording, not the previous one.
+            self._last_warning = None
+
             # Resolve microphone device.
             self._mic_idx = None
             if self._config.mic_enabled:
@@ -481,11 +492,20 @@ class AudioCapture:
                             "Mic device %r not found. Recording system audio only.",
                             self._config.mic_device_name,
                         )
+                        self._last_warning = (
+                            f"Configured microphone {self._config.mic_device_name!r} "
+                            f"was not found. Recording system audio only."
+                        )
                 else:
                     self._mic_idx = self._find_default_input_device()
                     if self._mic_idx is None:
                         logger.warning(
                             "No default input device found. Recording system audio only."
+                        )
+                        self._last_warning = (
+                            "No default microphone is available. Recording system "
+                            "audio only — open System Settings → Privacy & Security "
+                            "→ Microphone to grant access, or pick a device in Settings."
                         )
 
             self._recording = True
@@ -547,6 +567,16 @@ class AudioCapture:
         file was produced).
         """
         return self._last_error
+
+    @property
+    def last_warning(self) -> str | None:
+        """A non-fatal warning from the most recent start() call, if any.
+
+        Set when the configured microphone was not found or no default
+        input was available — both cases that previously degraded silently
+        to system-audio-only. Cleared on each call to start().
+        """
+        return self._last_warning
 
     @property
     def mic_audio_path(self) -> Path | None:

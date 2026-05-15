@@ -171,6 +171,18 @@ class ContextRecall:
     # Detector callbacks
     # ------------------------------------------------------------------
 
+    def _emit_capture_warnings(self) -> None:
+        """Surface any non-fatal warning AudioCapture recorded during start.
+
+        Called after _capture.start() returns successfully so the user sees
+        actionable hints (e.g. "configured mic not found, recording system
+        audio only") via the same pipeline.warning banner the silent-input
+        detector uses (Bug A4).
+        """
+        warning = getattr(self._capture, "last_warning", None)
+        if warning:
+            self._emit("pipeline.warning", source="mic", message=str(warning))
+
     def _wire_audio_level_callback(self) -> None:
         """Install the audio.level callback used by both auto-detect and
         manual-recording entry points. Resets the silent-input detector
@@ -214,6 +226,8 @@ class ContextRecall:
             logger.error("Failed to start audio capture: %s", e, exc_info=True)
             self._emit("pipeline.error", stage="capture", error=str(e))
             return
+
+        self._emit_capture_warnings()
 
         # Only update state after capture has started successfully.
         self._meeting_started_at = event.started_at or time.time()
@@ -783,6 +797,8 @@ class ContextRecall:
             logger.error("API recording start failed", exc_info=True)
             self._emit("pipeline.error", stage="capture", error="Failed to start audio capture")
             raise
+
+        self._emit_capture_warnings()
         self._meeting_started_at = time.time()
         self._emit("meeting.started", started_at=self._meeting_started_at)
 

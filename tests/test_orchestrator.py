@@ -498,3 +498,77 @@ def test_empty_transcript_still_marks_meeting_errored(
 
     error_calls = [c for c in app._db_update.call_args_list if c.kwargs.get("status") == "error"]
     assert error_calls, "empty transcript must be flagged as error"
+
+
+# ---------------------------------------------------------------------------
+# Bug A4: orchestrator must emit pipeline.warning when capture warns
+# ---------------------------------------------------------------------------
+
+
+@patch("src.main.Summariser")
+@patch("src.main.TeamsDetector")
+@patch("src.main.Transcriber")
+@patch("src.main.AudioCapture")
+def test_api_start_recording_emits_pipeline_warning_when_capture_warns(
+    mock_capture_cls,
+    mock_transcriber_cls,
+    mock_detector_cls,
+    mock_summariser_cls,
+    tmp_config,
+):
+    """Bug A4: when AudioCapture's start() degraded silently to system-only
+    (no default mic, configured mic missing), the user got no UI signal.
+    The orchestrator must read capture.last_warning after start() and emit
+    a pipeline.warning event so the existing UI banner (from A1) renders."""
+    from src.main import ContextRecall
+
+    app = ContextRecall(config_path=tmp_config)
+
+    # Pretend the capture layer surfaced a mic warning during start().
+    app._capture.last_warning = (
+        "Configured microphone 'USB Mic' was not found. Recording system audio only."
+    )
+    app._capture.start = MagicMock()
+
+    app._emit = MagicMock()
+    app.api_start_recording()
+
+    warning_calls = [
+        c for c in app._emit.call_args_list if c.args and c.args[0] == "pipeline.warning"
+    ]
+    assert warning_calls, (
+        "orchestrator must emit pipeline.warning when capture.last_warning is set; "
+        f"emitted: {[c.args for c in app._emit.call_args_list]}"
+    )
+    call = warning_calls[0]
+    assert call.kwargs.get("source") == "mic"
+    assert "USB Mic" in call.kwargs.get("message", "")
+
+
+@patch("src.main.Summariser")
+@patch("src.main.TeamsDetector")
+@patch("src.main.Transcriber")
+@patch("src.main.AudioCapture")
+def test_api_start_recording_no_warning_emitted_on_clean_start(
+    mock_capture_cls,
+    mock_transcriber_cls,
+    mock_detector_cls,
+    mock_summariser_cls,
+    tmp_config,
+):
+    """Counterpart: a clean start (mic resolved, no degraded paths) must
+    NOT emit a pipeline.warning — otherwise the banner would flash on
+    every recording."""
+    from src.main import ContextRecall
+
+    app = ContextRecall(config_path=tmp_config)
+    app._capture.last_warning = None
+    app._capture.start = MagicMock()
+
+    app._emit = MagicMock()
+    app.api_start_recording()
+
+    warning_calls = [
+        c for c in app._emit.call_args_list if c.args and c.args[0] == "pipeline.warning"
+    ]
+    assert not warning_calls, f"clean start must not emit pipeline.warning; got: {warning_calls}"

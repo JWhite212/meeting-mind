@@ -407,6 +407,107 @@ class TestNonBlockingStop:
 
 
 # ---------------------------------------------------------------------------
+# Bug A4: silent mic-fallback must surface a warning the orchestrator can emit
+# ---------------------------------------------------------------------------
+
+
+class TestMicResolutionWarning:
+    """Bug A4: when mic resolution silently degrades to system-only, the
+    user gets no UI signal. The mic device they expected to be recording
+    just isn't, and they only notice from missing audio in the transcript.
+    AudioCapture.last_warning surfaces the reason so the orchestrator can
+    emit a pipeline.warning event the existing UI banner already renders.
+    """
+
+    @pytest.fixture
+    def capture(self, tmp_path) -> AudioCapture:
+        return AudioCapture(AudioConfig(temp_audio_dir=str(tmp_path)))
+
+    def test_last_warning_is_none_initially(self, capture):
+        assert capture.last_warning is None
+
+    @patch.object(AudioCapture, "_record_loop")
+    @patch.object(AudioCapture, "_find_default_input_device", return_value=None)
+    @patch("src.audio_capture.sd.query_devices", return_value=MOCK_DEVICES)
+    def test_no_default_mic_sets_warning(self, mock_qd, mock_default, mock_record, capture):
+        capture._config.mic_enabled = True
+        capture._config.mic_device_name = ""
+        capture.start()
+        try:
+            assert capture.last_warning is not None
+            assert capture._mic_idx is None
+            assert "default" in capture.last_warning.lower()
+        finally:
+            capture._recording = False
+            if capture._thread and capture._thread.is_alive():
+                capture._thread.join(timeout=2)
+
+    @patch.object(AudioCapture, "_record_loop")
+    @patch.object(AudioCapture, "_find_default_input_device", return_value=None)
+    @patch("src.audio_capture.sd.query_devices", return_value=MOCK_DEVICES)
+    def test_named_mic_not_found_sets_warning(self, mock_qd, mock_default, mock_record, capture):
+        capture._config.mic_enabled = True
+        capture._config.mic_device_name = "DefinitelyNotAMicDevice"
+        capture.start()
+        try:
+            assert capture.last_warning is not None
+            assert capture._mic_idx is None
+            assert "DefinitelyNotAMicDevice" in capture.last_warning
+        finally:
+            capture._recording = False
+            if capture._thread and capture._thread.is_alive():
+                capture._thread.join(timeout=2)
+
+    @patch.object(AudioCapture, "_record_loop")
+    @patch.object(AudioCapture, "_find_default_input_device", return_value=1)
+    @patch("src.audio_capture.sd.query_devices", return_value=MOCK_DEVICES)
+    def test_successful_mic_resolution_sets_no_warning(
+        self, mock_qd, mock_default, mock_record, capture
+    ):
+        """When the default mic resolves, no warning should be set."""
+        capture._config.mic_enabled = True
+        capture._config.mic_device_name = ""
+        capture.start()
+        try:
+            assert capture.last_warning is None
+            assert capture._mic_idx == 1
+        finally:
+            capture._recording = False
+            if capture._thread and capture._thread.is_alive():
+                capture._thread.join(timeout=2)
+
+    @patch.object(AudioCapture, "_record_loop")
+    @patch.object(AudioCapture, "_find_default_input_device", return_value=None)
+    @patch("src.audio_capture.sd.query_devices", return_value=MOCK_DEVICES)
+    def test_mic_disabled_does_not_warn(self, mock_qd, mock_default, mock_record, capture):
+        """User explicitly disabled the mic — no warning, no surprise."""
+        capture._config.mic_enabled = False
+        capture.start()
+        try:
+            assert capture.last_warning is None
+        finally:
+            capture._recording = False
+            if capture._thread and capture._thread.is_alive():
+                capture._thread.join(timeout=2)
+
+    @patch.object(AudioCapture, "_record_loop")
+    @patch.object(AudioCapture, "_find_default_input_device", return_value=None)
+    @patch("src.audio_capture.sd.query_devices", return_value=MOCK_DEVICES)
+    def test_start_resets_previous_warning(self, mock_qd, mock_default, mock_record, capture):
+        """A successful subsequent start must clear a stale warning from
+        a prior session — otherwise the UI would show outdated hints."""
+        capture._last_warning = "stale warning from last session"
+        capture._config.mic_enabled = False  # Quiet path: no new warning
+        capture.start()
+        try:
+            assert capture.last_warning is None
+        finally:
+            capture._recording = False
+            if capture._thread and capture._thread.is_alive():
+                capture._thread.join(timeout=2)
+
+
+# ---------------------------------------------------------------------------
 # Bug A2: stream-open failures must signal callers immediately, not 120s later
 # ---------------------------------------------------------------------------
 
