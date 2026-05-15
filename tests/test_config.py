@@ -84,3 +84,34 @@ def test_load_empty_yaml(tmp_path: Path):
     config = load_config(config_file)
     assert isinstance(config, AppConfig)
     assert config.detection.poll_interval_seconds == 3
+
+
+def test_missing_file_still_expands_user_paths():
+    """When the config file is missing, load_config early-returns AppConfig()
+    with dataclass defaults. Those defaults contain literal '~' (e.g.
+    log_file='~/Library/Logs/Context Recall/contextrecall.log') and the
+    happy-path _expand_path() calls never run.
+
+    Symptom in production (2026-05-15 install): the installed daemon's
+    cwd was the .app bundle, so logging.FileHandler resolved
+    '~/Library/...' relative to that cwd and wrote app logs to a literal
+    '~' directory INSIDE the .app bundle — invisible to the user and
+    deleted on every reinstall.
+
+    Expansion of '~' in path defaults must happen regardless of whether
+    a config file was loaded."""
+    config = load_config(Path("/definitely/does/not/exist.yaml"))
+
+    assert "~" not in config.logging.log_file, (
+        f"log_file must have ~ expanded even when no config file is loaded; "
+        f"got {config.logging.log_file!r}"
+    )
+    assert "~" not in config.audio.temp_audio_dir, (
+        f"temp_audio_dir must have ~ expanded; got {config.audio.temp_audio_dir!r}"
+    )
+    assert "~" not in config.markdown.vault_path, (
+        f"vault_path must have ~ expanded; got {config.markdown.vault_path!r}"
+    )
+    assert config.logging.log_file.startswith(os.path.expanduser("~")), (
+        f"log_file should resolve into the user's home directory; got {config.logging.log_file!r}"
+    )

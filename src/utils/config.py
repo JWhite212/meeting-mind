@@ -301,7 +301,16 @@ def load_config(config_path: Optional[Path] = None) -> AppConfig:
 
     if not path.exists():
         logger.warning("No config found at %s — using defaults.", path)
-        return AppConfig()
+        config = AppConfig()
+        # Defaults contain literal '~' (e.g. log_file, temp_audio_dir,
+        # vault_path). Without this expansion the daemon will treat '~'
+        # as a real directory name relative to its cwd — observed in
+        # production on 2026-05-15 when the installed daemon wrote app
+        # logs to a literal '~/Library/...' path inside the .app bundle.
+        config.audio.temp_audio_dir = _expand_path(config.audio.temp_audio_dir)
+        config.markdown.vault_path = _expand_path(config.markdown.vault_path)
+        config.logging.log_file = _expand_path(config.logging.log_file)
+        return config
 
     with open(path, "r") as f:
         raw = yaml.safe_load(f) or {}
