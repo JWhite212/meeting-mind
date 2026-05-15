@@ -15,14 +15,22 @@ native Notion blocks rather than dumped as plain text.
 
 import logging
 import time
+from typing import Any, Callable
 
 from notion_client import Client as NotionClient
+from notion_client.errors import APIResponseError, HTTPResponseError
 
 from src.summariser import MeetingSummary
 from src.transcriber import Transcript
 from src.utils.config import NotionConfig
 
 logger = logging.getLogger(__name__)
+
+# Retry tuning for transient Notion failures (5xx + 429). Three attempts with
+# exponential backoff keeps total wall-time bounded (~7s worst case before
+# honouring a Retry-After header) so the pipeline isn't blocked indefinitely.
+_RETRY_ATTEMPTS = 3
+_RETRY_BASE_DELAY = 1.0
 
 
 class NotionWriter:
@@ -31,14 +39,17 @@ class NotionWriter:
     def __init__(self, config: NotionConfig):
         self._config = config
         self._client: NotionClient | None = None
+        # Set when a Notion API call fails (4xx or exhausted retries on 5xx).
+        # The orchestrator emits a pipeline.warning so the UI can surface
+        # "Notion output skipped: <reason>" rather than failing silently.
+        self.last_error: str | None = None
 
     def _get_client(self) -> NotionClient:
         """Lazy-initialise the Notion client."""
         if self._client is None:
             if not self._config.api_key:
                 raise ValueError(
-                    "Notion API key not set. Add it to config.yaml "
-                    "under notion.api_key."
+                    "Notion API key not set. Add it to config.yaml under notion.api_key."
                 )
             self._client = NotionClient(auth=self._config.api_key)
         return self._client
@@ -97,10 +108,12 @@ class NotionWriter:
             return [{"type": "text", "text": {"content": text}}]
         chunks = []
         for i in range(0, len(text), NotionWriter._NOTION_TEXT_LIMIT):
-            chunks.append({
-                "type": "text",
-                "text": {"content": text[i:i + NotionWriter._NOTION_TEXT_LIMIT]},
-            })
+            chunks.append(
+                {
+                    "type": "text",
+                    "text": {"content": text[i : i + NotionWriter._NOTION_TEXT_LIMIT]},
+                }
+            )
         return chunks
 
     def _heading_block(self, text: str, level: int) -> dict:
@@ -131,22 +144,77 @@ class NotionWriter:
             },
         }
 
+    @staticmethod
+    def _retry_after_seconds(err: HTTPResponseError) -> float | None:
+        """Extract a Retry-After delay (seconds) from an HTTP error, or None."""
+        headers = getattr(err, "headers", None)
+        if not headers:
+            return None
+        value = headers.get("Retry-After")
+        if not value:
+            return None
+        try:
+            return max(0.0, float(value))
+        except (TypeError, ValueError):
+            return None
+
+    def _call_with_retry(self, func: Callable[[], Any], description: str) -> Any:
+        """Run a Notion client call with retry on 5xx/429.
+
+        4xx responses (other than 429) raise ``APIResponseError`` and are
+        re-raised immediately so the caller can stash them on ``last_error``.
+        5xx responses retry with exponential backoff. 429 honours the
+        ``Retry-After`` header when present.
+        """
+        last_exc: HTTPResponseError | None = None
+        for attempt in range(1, _RETRY_ATTEMPTS + 1):
+            try:
+                return func()
+            except HTTPResponseError as e:
+                status = getattr(e, "status", 0) or 0
+                # 5xx or 429 are retryable; everything else bubbles immediately.
+                if status < 500 and status != 429:
+                    raise
+                last_exc = e
+                if attempt == _RETRY_ATTEMPTS:
+                    break
+                retry_after = self._retry_after_seconds(e) if status == 429 else None
+                delay = (
+                    retry_after
+                    if retry_after is not None
+                    else _RETRY_BASE_DELAY * (2 ** (attempt - 1))
+                )
+                logger.warning(
+                    "Notion %s failed (status=%s, attempt %d/%d); retrying in %.1fs",
+                    description,
+                    status,
+                    attempt,
+                    _RETRY_ATTEMPTS,
+                    delay,
+                )
+                time.sleep(delay)
+        # Exhausted all attempts on a retryable error.
+        assert last_exc is not None
+        raise last_exc
+
     def write(
         self,
         summary: MeetingSummary,
         transcript: Transcript,
         started_at: float,
         duration_seconds: float,
-    ) -> str:
+    ) -> str | None:
         """
         Create a new page in the configured Notion database.
 
-        Returns the URL of the created page.
+        Returns the URL of the created page, or ``None`` if the call failed
+        with a 4xx error or exhausted its retries on a 5xx/429. In that case
+        ``last_error`` is set with a human-readable message.
         """
+        self.last_error = None
         if not self._config.database_id:
             raise ValueError(
-                "Notion database ID not set. Add it to config.yaml "
-                "under notion.database_id."
+                "Notion database ID not set. Add it to config.yaml under notion.database_id."
             )
         client = self._get_client()
         props = self._config.properties
@@ -181,11 +249,29 @@ class NotionWriter:
         # Batch if needed (unlikely for a meeting summary, but safe).
         children = blocks[:100]
 
-        response = client.pages.create(
-            parent={"database_id": self._config.database_id},
-            properties=properties,
-            children=children,
-        )
+        try:
+            response = self._call_with_retry(
+                lambda: client.pages.create(
+                    parent={"database_id": self._config.database_id},
+                    properties=properties,
+                    children=children,
+                ),
+                description="pages.create",
+            )
+        except APIResponseError as e:
+            # 4xx: a permanent client error (auth, validation, missing DB).
+            # Stash so the orchestrator can surface it as a pipeline.warning.
+            self.last_error = f"Notion API error ({getattr(e, 'status', '?')}): {e}"
+            logger.error("Notion write failed: %s", self.last_error)
+            return None
+        except HTTPResponseError as e:
+            # 5xx/429 retries exhausted.
+            self.last_error = (
+                f"Notion API unavailable (status {getattr(e, 'status', '?')}) "
+                f"after {_RETRY_ATTEMPTS} attempts: {e}"
+            )
+            logger.error("Notion write failed: %s", self.last_error)
+            return None
 
         page_url = response.get("url", "")
         page_id = response.get("id", "")
@@ -193,18 +279,34 @@ class NotionWriter:
         # Append remaining blocks if the summary exceeded 100.
         if len(blocks) > 100:
             logger.info(
-                "Summary has %d blocks; appending in batches "
-                "(Notion limit: 100 per request).",
+                "Summary has %d blocks; appending in batches (Notion limit: 100 per request).",
                 len(blocks),
             )
-            for batch_num, i in enumerate(
-                range(100, len(blocks), 100), start=2
-            ):
+            for batch_num, i in enumerate(range(100, len(blocks), 100), start=2):
                 batch = blocks[i : i + 100]
-                client.blocks.children.append(
-                    block_id=page_id,
-                    children=batch,
-                )
+                try:
+                    self._call_with_retry(
+                        lambda batch=batch: client.blocks.children.append(
+                            block_id=page_id,
+                            children=batch,
+                        ),
+                        description="blocks.children.append",
+                    )
+                except APIResponseError as e:
+                    self.last_error = (
+                        f"Notion block append failed at batch {batch_num} "
+                        f"({getattr(e, 'status', '?')}): {e}"
+                    )
+                    logger.error("Notion partial write: %s", self.last_error)
+                    return page_url
+                except HTTPResponseError as e:
+                    self.last_error = (
+                        f"Notion block append failed at batch {batch_num} "
+                        f"after {_RETRY_ATTEMPTS} attempts "
+                        f"(status {getattr(e, 'status', '?')}): {e}"
+                    )
+                    logger.error("Notion partial write: %s", self.last_error)
+                    return page_url
 
         logger.info("Notion page created: %s", page_url)
         return page_url
