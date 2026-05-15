@@ -404,3 +404,60 @@ class TestNonBlockingStop:
         capture._recording = False
         if capture._thread and capture._thread.is_alive():
             capture._thread.join(timeout=2)
+
+
+# ---------------------------------------------------------------------------
+# Bug A2: stream-open failures must signal callers immediately, not 120s later
+# ---------------------------------------------------------------------------
+
+
+class TestStreamOpenFailureSignaling:
+    """Reproduces Bug A2: when InputStream.start() raises (mic permission
+    denied, device unavailable, kernel audio crash), the existing code
+    swallows the error in the audio thread and never sets _merge_complete.
+    The orchestrator's wait_for_merge then blocks for the full 120s timeout
+    before marking the meeting as 'error', and the user gets no clue that
+    the original cause was a microphone permission problem."""
+
+    @pytest.fixture
+    def capture(self, tmp_path) -> AudioCapture:
+        config = AudioConfig(temp_audio_dir=str(tmp_path))
+        return AudioCapture(config)
+
+    def test_last_error_is_none_initially(self, capture):
+        """A fresh AudioCapture has no recorded error."""
+        assert capture.last_error is None
+
+    @patch.object(AudioCapture, "_find_default_input_device", return_value=None)
+    @patch("src.audio_capture.sd.query_devices", return_value=MOCK_DEVICES)
+    @patch("src.audio_capture.sd.InputStream")
+    def test_stream_start_failure_sets_merge_complete_and_last_error(
+        self, mock_input_stream, mock_qd, mock_default, capture
+    ):
+        """When InputStream.start() raises, the audio thread must:
+        1. Record the error in capture.last_error so callers can surface it.
+        2. Set _merge_complete so wait_for_merge returns immediately, not
+           after the 120s timeout.
+        """
+        # Simulate macOS denying microphone permission. PortAudio surfaces
+        # this as an exception from .start(), not from the constructor.
+        mock_stream_instance = MagicMock()
+        mock_stream_instance.start.side_effect = Exception(
+            "PaErrorCode -9986: invalid device or permission denied"
+        )
+        mock_input_stream.return_value = mock_stream_instance
+
+        capture.start()
+        # Wait for the background thread to hit the failure and exit.
+        if capture._thread:
+            capture._thread.join(timeout=5)
+
+        # Caller must not wait 120s for a verdict on a failure that already
+        # happened. wait_for_merge must return True (event is set) quickly.
+        assert capture.wait_for_merge(timeout=1.0) is True
+
+        # Caller must be able to discover what went wrong without parsing
+        # log files. last_error must be a typed AudioCaptureError so the
+        # orchestrator can switch on it and surface a real message to the UI.
+        assert capture.last_error is not None
+        assert isinstance(capture.last_error, AudioCaptureError)

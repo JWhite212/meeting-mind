@@ -69,6 +69,11 @@ class AudioCapture:
         self._streams_stopped = threading.Event()
         self._merge_complete = threading.Event()
 
+        # Last unrecoverable capture error, surfaced to the orchestrator so
+        # it can emit a meaningful pipeline.error to the UI instead of
+        # silently waiting on a 120s merge timeout.
+        self._last_error: AudioCaptureError | None = None
+
         # Ensure the temp directory exists with owner-only permissions.
         os.makedirs(config.temp_audio_dir, exist_ok=True)
         os.chmod(config.temp_audio_dir, 0o700)
@@ -228,8 +233,14 @@ class AudioCapture:
 
         except Exception as e:
             logger.error("Audio capture failed: %s", e, exc_info=True)
+            self._last_error = AudioCaptureError(f"Failed to capture audio: {e}")
             self._output_path = None
             self._recording = False
+            # Signal merge-complete on the failure path so callers waiting
+            # on wait_for_merge unblock immediately rather than after the
+            # 120s timeout. There is no merged file to consume — callers
+            # must check last_error / output_path before reading.
+            self._merge_complete.set()
             return
 
         finally:
@@ -478,6 +489,7 @@ class AudioCapture:
                         )
 
             self._recording = True
+            self._last_error = None
             self._streams_stopped.clear()
             self._merge_complete.clear()
             self._thread = threading.Thread(
@@ -524,6 +536,17 @@ class AudioCapture:
     @property
     def is_recording(self) -> bool:
         return self._recording
+
+    @property
+    def last_error(self) -> AudioCaptureError | None:
+        """The last unrecoverable error from the capture thread, if any.
+
+        Cleared on each call to start(). Callers should consult this after
+        wait_for_merge() returns to distinguish a successful merge from
+        an early failure (where wait_for_merge returns True but no audio
+        file was produced).
+        """
+        return self._last_error
 
     @property
     def mic_audio_path(self) -> Path | None:

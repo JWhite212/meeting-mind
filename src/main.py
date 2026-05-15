@@ -376,8 +376,29 @@ class ContextRecall:
         if hasattr(self._capture, "wait_for_merge"):
             if not self._capture.wait_for_merge(timeout=120):
                 logger.error("Audio merge timed out after 120s. Skipping processing.")
+                self._emit(
+                    "pipeline.error",
+                    meeting_id=meeting_id,
+                    stage="capture",
+                    error="Audio merge timed out — capture may have hung.",
+                )
                 self._db_update(meeting_id, status="error")
                 return
+
+        # If the capture thread reported a typed error (e.g. mic permission
+        # denied, device unavailable), surface it before pretending we have
+        # an audio file to transcribe.
+        capture_error = getattr(self._capture, "last_error", None)
+        if isinstance(capture_error, AudioCaptureError):
+            logger.error("Audio capture failed: %s", capture_error)
+            self._emit(
+                "pipeline.error",
+                meeting_id=meeting_id,
+                stage="capture",
+                error=str(capture_error),
+            )
+            self._db_update(meeting_id, status="error")
+            return
 
         # Step 1: Transcribe.
         logger.info("Transcribing audio...")
