@@ -10,6 +10,9 @@ export interface DiagnosticsData {
   platform?: string;
   apple_silicon?: boolean;
   blackhole_found?: boolean;
+  blackhole_candidates?: string[];
+  configured_blackhole_device?: string;
+  configured_blackhole_available?: boolean;
   microphone_available?: boolean;
   audio_output_devices?: string[];
   ollama_reachable?: boolean;
