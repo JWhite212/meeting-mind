@@ -19,13 +19,36 @@ import yaml
 logger = logging.getLogger(__name__)
 
 
-# Resolve project root. Inside a PyInstaller frozen binary, __file__
-# doesn't exist in the usual sense — use sys.executable instead.
-if getattr(sys, "frozen", False):
-    PROJECT_ROOT = Path(sys.executable).resolve().parent
-else:
-    PROJECT_ROOT = Path(__file__).resolve().parent.parent.parent
-DEFAULT_CONFIG_PATH = PROJECT_ROOT / "config.yaml"
+def _default_config_path() -> Path:
+    """Resolve the default location of config.yaml.
+
+    For a frozen (PyInstaller) build, ``sys.executable`` lives inside the
+    .app bundle at ``/Applications/<App>.app/Contents/Resources/.../
+    context-recall-daemon/``. Resolving the config path relative to that
+    directory puts it inside the read-only bundle, where no user-editable
+    config can exist — observed on 2026-05-15 as the installed daemon
+    running on pure defaults and logging "No config found" once per
+    minute. Use ``app_support_dir()`` so the daemon picks up the same
+    config the UI writes through the settings surface.
+
+    For source runs (pytest, ``python -m src.main`` from a checkout),
+    resolve relative to ``__file__`` so dev workflows keep using the
+    tracked ``config.yaml`` at the project root.
+    """
+    if getattr(sys, "frozen", False):
+        # Lazy import: paths.py imports nothing heavy, but keeping the
+        # call site lazy lets monkeypatched tests substitute the module.
+        from src.utils.paths import app_support_dir
+
+        return app_support_dir() / "config.yaml"
+    return Path(__file__).resolve().parent.parent.parent / "config.yaml"
+
+
+DEFAULT_CONFIG_PATH = _default_config_path()
+# Backwards-compat: PROJECT_ROOT used to be a module-level constant.
+# Nothing outside this file consumes it today, but keep it derivable so
+# any external diagnostic that imports it doesn't suddenly break.
+PROJECT_ROOT = DEFAULT_CONFIG_PATH.parent
 
 
 _SAFE_PROCESS_NAME = re.compile(r"^[\w\s.()\-]+$")

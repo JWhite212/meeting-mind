@@ -1,6 +1,7 @@
 """Tests for config loading and dataclass construction."""
 
 import os
+import sys
 from pathlib import Path
 
 import yaml
@@ -11,6 +12,7 @@ from src.utils.config import (
     DetectionConfig,
     TranscriptionConfig,
     _build_dataclass,
+    _default_config_path,
     _expand_path,
     load_config,
 )
@@ -114,4 +116,40 @@ def test_missing_file_still_expands_user_paths():
     )
     assert config.logging.log_file.startswith(os.path.expanduser("~")), (
         f"log_file should resolve into the user's home directory; got {config.logging.log_file!r}"
+    )
+
+
+def test_default_config_path_frozen_uses_app_support_dir(monkeypatch):
+    """For a frozen (PyInstaller) build, the daemon binary lives inside
+    the .app bundle at /Applications/<App>.app/Contents/Resources/.../
+    context-recall-daemon/. Resolving DEFAULT_CONFIG_PATH relative to
+    sys.executable.parent puts it INSIDE the bundle, where no user-
+    editable config can exist — that's why the installed daemon ran on
+    pure defaults for the whole 2026-05-15 install.
+
+    Frozen builds must look in the user's Application Support dir so
+    customisations actually take effect."""
+    from src.utils import paths
+
+    monkeypatch.setattr(sys, "frozen", True, raising=False)
+    resolved = _default_config_path()
+
+    expected = paths.app_support_dir() / "config.yaml"
+    assert resolved == expected, f"frozen-build config path must be {expected}, got {resolved}"
+    # And it must not live inside the .app bundle.
+    assert "/Applications/" not in str(resolved), (
+        f"frozen config path must not point into the .app bundle; got {resolved}"
+    )
+
+
+def test_default_config_path_source_uses_project_root(monkeypatch):
+    """Counterpart: source runs (pytest, `python -m src.main` from a
+    checkout) must keep resolving next to the project, not Application
+    Support, so dev workflows are unchanged."""
+    monkeypatch.delattr(sys, "frozen", raising=False)
+    resolved = _default_config_path()
+
+    assert resolved.name == "config.yaml"
+    assert "Application Support" not in str(resolved), (
+        f"source-run config path must not point at Application Support; got {resolved}"
     )
