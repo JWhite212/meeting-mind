@@ -9,8 +9,6 @@ asyncio task and returns 202 Accepted immediately, so the UI gets
 instant feedback and the existing pipeline.* events drive the result UI.
 """
 
-import asyncio
-import os
 import time
 from unittest.mock import AsyncMock, MagicMock, patch
 
