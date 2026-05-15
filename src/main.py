@@ -35,6 +35,7 @@ from src.detector import MeetingEvent, MeetingState, TeamsDetector
 from src.diariser import EnergyDiariser, create_diariser
 from src.output.markdown_writer import MarkdownWriter
 from src.output.notion_writer import NotionWriter
+from src.silent_input_detector import SilentInputDetector
 from src.summariser import Summariser
 from src.templates import TemplateManager
 from src.transcriber import Transcriber
@@ -96,6 +97,12 @@ class ContextRecall:
 
         # Live transcription (optional).
         self._live_transcriber = None
+
+        # Detects "BlackHole installed but not routed" — the audio stream
+        # opens fine but delivers only silence. Surfaces a one-shot warning
+        # so the user can fix routing while the meeting is still in flight,
+        # rather than discovering it from an empty transcript at the end.
+        self._silent_input_detector = SilentInputDetector()
 
         # Calendar integration (optional).
         self._calendar_matcher: CalendarMatcher | None = None
@@ -164,19 +171,42 @@ class ContextRecall:
     # Detector callbacks
     # ------------------------------------------------------------------
 
-    def _on_meeting_start(self, event: MeetingEvent) -> None:
-        """Called by the detector when a Teams meeting begins."""
-        logger.info("Starting audio capture...")
+    def _wire_audio_level_callback(self) -> None:
+        """Install the audio.level callback used by both auto-detect and
+        manual-recording entry points. Resets the silent-input detector
+        for the new session and emits pipeline.warning when prolonged
+        silence is observed on the system source."""
+        self._silent_input_detector.reset()
 
-        # Wire audio level callback for live metering.
         def _on_level(system_rms: float, mic_rms: float) -> None:
             self._emit(
                 "audio.level",
                 system_rms=round(system_rms, 6),
                 mic_rms=round(mic_rms, 6),
             )
+            if self._silent_input_detector.observe(system_rms=system_rms, now=time.monotonic()):
+                logger.warning(
+                    "System audio source delivered silence for the alert "
+                    "window — BlackHole may be installed but not routed."
+                )
+                self._emit(
+                    "pipeline.warning",
+                    type="silent_input",
+                    source="system",
+                    message=(
+                        "No system audio detected. If you are using BlackHole, "
+                        "make sure your system output is routed to it via a "
+                        "Multi-Output Device in Audio MIDI Setup."
+                    ),
+                )
 
         self._capture.on_audio_level = _on_level
+
+    def _on_meeting_start(self, event: MeetingEvent) -> None:
+        """Called by the detector when a Teams meeting begins."""
+        logger.info("Starting audio capture...")
+
+        self._wire_audio_level_callback()
 
         try:
             self._capture.start()
@@ -718,16 +748,7 @@ class ContextRecall:
 
         Raises AudioCaptureError if the audio device cannot be opened.
         """
-
-        # Wire audio level callback for live metering.
-        def _on_level(system_rms: float, mic_rms: float) -> None:
-            self._emit(
-                "audio.level",
-                system_rms=round(system_rms, 6),
-                mic_rms=round(mic_rms, 6),
-            )
-
-        self._capture.on_audio_level = _on_level
+        self._wire_audio_level_callback()
 
         try:
             self._capture.start()
