@@ -678,6 +678,17 @@ class ContextRecall:
             return
         loop = self._api_server.loop
         if not loop or loop.is_closed():
+            # The API server existed when this update was scheduled but is
+            # now torn down (Bug C3). The pipeline thread will continue
+            # silently, leaving the row in whatever transient status the
+            # last successful update wrote. Surface this loudly so on-call
+            # can correlate stuck rows with the daemon shutdown.
+            logger.error(
+                "DB update for meeting %s dropped: event loop is %s. Fields lost: %s",
+                meeting_id,
+                "closed" if loop and loop.is_closed() else "missing",
+                sorted(fields.keys()),
+            )
             return
         try:
             future = asyncio.run_coroutine_threadsafe(

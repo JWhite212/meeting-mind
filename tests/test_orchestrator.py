@@ -327,3 +327,88 @@ def test_audio_persistence_fallback_to_copy(
             with patch("shutil.copy2") as mock_copy:
                 app._process_audio(audio_file, started_at=1000.0, duration_seconds=60.0)
                 mock_copy.assert_called_once()
+
+
+# ---------------------------------------------------------------------------
+# Bug C3: silent _db_update on closed event loop
+# ---------------------------------------------------------------------------
+
+
+@patch("src.main.Summariser")
+@patch("src.main.TeamsDetector")
+@patch("src.main.Transcriber")
+@patch("src.main.AudioCapture")
+def test_db_update_logs_error_when_event_loop_is_closed(
+    mock_capture_cls,
+    mock_transcriber_cls,
+    mock_detector_cls,
+    mock_summariser_cls,
+    tmp_config,
+    caplog,
+):
+    """Reproduce Bug C3: when the API event loop has been torn down (UI
+    closed mid-pipeline, daemon shutting down), _db_update silently drops
+    the status update. The pipeline thread continues to "completion" but
+    the meeting stays in 'transcribing' forever, with no log line to
+    explain why the row never advanced.
+
+    The fix surfaces a logger.error including the meeting id and the
+    fields that were dropped so on-call can grep for it.
+    """
+    import logging
+
+    from src.main import ContextRecall
+
+    app = ContextRecall(config_path=tmp_config)
+
+    mock_server = MagicMock()
+    mock_repo = MagicMock()
+    mock_loop = MagicMock()
+    mock_loop.is_closed.return_value = True  # the bug condition
+
+    mock_server.repo = mock_repo
+    mock_server.loop = mock_loop
+    app._api_server = mock_server
+
+    with caplog.at_level(logging.ERROR, logger="contextrecall"):
+        app._db_update("meeting-123", status="error", title="X")
+
+    error_records = [r for r in caplog.records if r.levelno >= logging.ERROR]
+    assert error_records, (
+        "expected an ERROR log when scheduling a DB update on a closed loop; "
+        "instead the function returned silently and the meeting will stay "
+        "in its previous transient status forever"
+    )
+    combined = " ".join(r.getMessage() for r in error_records)
+    assert "meeting-123" in combined, (
+        "log must include the meeting id so on-call can correlate stuck rows"
+    )
+
+
+@patch("src.main.Summariser")
+@patch("src.main.TeamsDetector")
+@patch("src.main.Transcriber")
+@patch("src.main.AudioCapture")
+def test_db_update_silent_when_no_api_server(
+    mock_capture_cls,
+    mock_transcriber_cls,
+    mock_detector_cls,
+    mock_summariser_cls,
+    tmp_config,
+    caplog,
+):
+    """Counterpart: when there is no api_server at all (test mode, headless
+    daemon), _db_update must remain silent. Only an actively-broken loop
+    is an error worth logging."""
+    import logging
+
+    from src.main import ContextRecall
+
+    app = ContextRecall(config_path=tmp_config)
+    app._api_server = None  # no API at all
+
+    with caplog.at_level(logging.ERROR, logger="contextrecall"):
+        app._db_update("meeting-123", status="error")
+
+    error_records = [r for r in caplog.records if r.levelno >= logging.ERROR]
+    assert not error_records, "no api_server is a legitimate runtime mode and must not log an error"
