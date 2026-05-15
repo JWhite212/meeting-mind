@@ -410,6 +410,23 @@ class MeetingRepository:
 
         return {"audio_deleted": audio_deleted, "records_deleted": records_deleted}
 
+    async def reset_stale_inflight_meetings(self) -> int:
+        """Flip any meeting still in a transient pipeline status to 'error'.
+
+        Called on daemon startup. Any 'recording' / 'transcribing' row at
+        startup is necessarily orphaned — the only thread that could have
+        been advancing it died with the previous daemon process. Without
+        this, such rows stay 'transcribing' forever and the UI surfaces no
+        recovery action for them.
+        """
+        cursor = await self._db.conn.execute(
+            "UPDATE meetings SET status = 'error', updated_at = ? "
+            "WHERE status IN ('recording', 'transcribing')",
+            (time.time(),),
+        )
+        await self._db.conn.commit()
+        return cursor.rowcount
+
     async def update_fts(self, meeting_id: str) -> None:
         """Update the FTS index for a meeting after transcript/summary changes."""
         try:

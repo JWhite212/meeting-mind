@@ -17,6 +17,7 @@ import {
 } from "../../lib/api";
 import { ActionItemCard } from "../action-items/ActionItemCard";
 import { API_BASE } from "../../lib/constants";
+import { canRetryMeeting } from "../../lib/meetingStatus";
 import type { TranscriptSegment } from "../../lib/types";
 import { AudioPlayer, type AudioSeekHandle } from "./AudioPlayer";
 import { LoadingBlock } from "../common/Spinner";
@@ -723,35 +724,34 @@ export function MeetingDetail() {
 
       {/* Actions row */}
       <div className="flex items-center gap-2">
-        {/* Process / retry for pending or error meetings */}
-        {(meeting.status === "error" || meeting.status === "pending") &&
-          meeting.audio_path && (
-            <button
-              onClick={() => reprocess.mutate()}
-              disabled={reprocess.isPending}
-              className="px-3 py-1.5 text-xs rounded-lg bg-accent text-white hover:bg-accent/90 transition-colors flex items-center gap-1.5 disabled:opacity-50"
+        {/* Process / retry for pending, error, or orphaned-transcribing meetings */}
+        {canRetryMeeting(meeting) && (
+          <button
+            onClick={() => reprocess.mutate()}
+            disabled={reprocess.isPending}
+            className="px-3 py-1.5 text-xs rounded-lg bg-accent text-white hover:bg-accent/90 transition-colors flex items-center gap-1.5 disabled:opacity-50"
+          >
+            <svg
+              width="14"
+              height="14"
+              viewBox="0 0 24 24"
+              fill="none"
+              stroke="currentColor"
+              strokeWidth="2"
+              strokeLinecap="round"
+              strokeLinejoin="round"
+              aria-hidden="true"
             >
-              <svg
-                width="14"
-                height="14"
-                viewBox="0 0 24 24"
-                fill="none"
-                stroke="currentColor"
-                strokeWidth="2"
-                strokeLinecap="round"
-                strokeLinejoin="round"
-                aria-hidden="true"
-              >
-                <polyline points="23 4 23 10 17 10" />
-                <path d="M20.49 15a9 9 0 1 1-2.12-9.36L23 10" />
-              </svg>
-              {reprocess.isPending
-                ? "Processing..."
-                : meeting.status === "pending"
-                  ? "Process Now"
-                  : "Retry Transcription"}
-            </button>
-          )}
+              <polyline points="23 4 23 10 17 10" />
+              <path d="M20.49 15a9 9 0 1 1-2.12-9.36L23 10" />
+            </svg>
+            {reprocess.isPending
+              ? "Processing..."
+              : meeting.status === "pending"
+                ? "Process Now"
+                : "Retry Transcription"}
+          </button>
+        )}
         {/* Re-summarise */}
         {hasTranscript && (
           <div className="relative inline-block" ref={resummariseMenuRef}>

@@ -354,3 +354,78 @@ async def test_speaker_name_updates_transcript(repo: MeetingRepository):
     updated = json.loads(meeting.transcript_json)
     assert updated["segments"][0]["speaker"] == "Alice"
     assert updated["segments"][1]["speaker"] == "SPEAKER_01"
+
+
+# ------------------------------------------------------------------
+# Stale-status recovery (Bug C2)
+# ------------------------------------------------------------------
+
+
+@pytest.mark.asyncio
+async def test_reset_stale_inflight_meetings_flips_transcribing_to_error(
+    repo: MeetingRepository,
+):
+    """Meetings stuck in 'transcribing' on startup must be flipped to 'error'.
+
+    Reproduces Bug C2: when the daemon crashes mid-pipeline, the meeting row
+    stays in 'transcribing' forever because no code resets it. The UI doesn't
+    expose a Retry button for 'transcribing' rows, so the user is wedged
+    until restart — and even after restart, nothing fixes the row.
+    """
+    mid = await repo.create_meeting(started_at=time.time(), status="transcribing")
+
+    flipped = await repo.reset_stale_inflight_meetings()
+
+    assert flipped == 1
+    meeting = await repo.get_meeting(mid)
+    assert meeting.status == "error"
+
+
+@pytest.mark.asyncio
+async def test_reset_stale_inflight_meetings_flips_recording_to_error(
+    repo: MeetingRepository,
+):
+    """Same as above but for the 'recording' transient status."""
+    mid = await repo.create_meeting(started_at=time.time(), status="recording")
+
+    flipped = await repo.reset_stale_inflight_meetings()
+
+    assert flipped == 1
+    meeting = await repo.get_meeting(mid)
+    assert meeting.status == "error"
+
+
+@pytest.mark.asyncio
+async def test_reset_stale_inflight_meetings_leaves_terminal_statuses_alone(
+    repo: MeetingRepository,
+):
+    """Reset must not touch complete/error/pending rows."""
+    now = time.time()
+    complete_id = await repo.create_meeting(started_at=now, status="complete")
+    error_id = await repo.create_meeting(started_at=now, status="error")
+    pending_id = await repo.create_meeting(started_at=now, status="pending")
+
+    flipped = await repo.reset_stale_inflight_meetings()
+
+    assert flipped == 0
+    assert (await repo.get_meeting(complete_id)).status == "complete"
+    assert (await repo.get_meeting(error_id)).status == "error"
+    assert (await repo.get_meeting(pending_id)).status == "pending"
+
+
+@pytest.mark.asyncio
+async def test_reset_stale_inflight_meetings_handles_mixed_set(
+    repo: MeetingRepository,
+):
+    """A realistic mixed set: only the in-flight rows are flipped."""
+    now = time.time()
+    transcribing_id = await repo.create_meeting(started_at=now, status="transcribing")
+    recording_id = await repo.create_meeting(started_at=now, status="recording")
+    complete_id = await repo.create_meeting(started_at=now, status="complete")
+
+    flipped = await repo.reset_stale_inflight_meetings()
+
+    assert flipped == 2
+    assert (await repo.get_meeting(transcribing_id)).status == "error"
+    assert (await repo.get_meeting(recording_id)).status == "error"
+    assert (await repo.get_meeting(complete_id)).status == "complete"

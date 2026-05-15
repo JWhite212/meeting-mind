@@ -36,6 +36,7 @@ import { useDaemonStatus } from "./hooks/useDaemonStatus";
 import { useWebSocket } from "./hooks/useWebSocket";
 import { useTraySync } from "./hooks/useTraySync";
 import { useNotifications } from "./hooks/useNotifications";
+import { usePipelineSync } from "./hooks/usePipelineSync";
 import { useAppStore } from "./stores/appStore";
 import { setAuthToken } from "./lib/api";
 import type { WSEvent } from "./lib/types";
@@ -56,6 +57,7 @@ function AppShell() {
   const [showOnboarding, setShowOnboarding] = useState(!isOnboardingComplete());
   useTraySync(state);
   useNotifications(lastEvent);
+  usePipelineSync();
 
   const onWSEvent = useCallback(
     (event: WSEvent) => {

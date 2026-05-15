@@ -255,6 +255,16 @@ class ApiServer:
         await self.db.connect()
         self.repo = MeetingRepository(self.db)
 
+        # Recover meetings orphaned by a previous daemon process that died
+        # mid-pipeline (Bug C2). Without this, rows stay in 'transcribing'
+        # forever and the UI offers no recovery action for them.
+        try:
+            flipped = await self.repo.reset_stale_inflight_meetings()
+            if flipped:
+                logger.info("Recovered %d meeting(s) stuck in transient status", flipped)
+        except Exception:
+            logger.warning("Stale-status recovery failed", exc_info=True)
+
         # Run data retention cleanup on startup.
         try:
             app_config = load_config()
