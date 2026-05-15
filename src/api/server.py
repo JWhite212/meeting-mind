@@ -16,6 +16,7 @@ from fastapi.middleware.cors import CORSMiddleware
 
 from src.api.auth import _get_token, verify_token
 from src.api.events import EventBus
+from src.api.middleware import BodySizeLimitMiddleware
 from src.api.routes import calendar as calendar_routes
 from src.api.routes import config as config_routes
 from src.api.routes import devices as devices_routes
@@ -93,6 +94,9 @@ class ApiServer:
             version="0.1.0",
             docs_url="/docs",
         )
+
+        # Reject oversized request bodies before they reach route handlers.
+        app.add_middleware(BodySizeLimitMiddleware, max_bytes=5 * 1024 * 1024)
 
         # CORS for Tauri dev mode (Vite at localhost:1420) and production.
         app.add_middleware(
@@ -296,6 +300,10 @@ class ApiServer:
             port=self.port,
             log_level="warning",
             access_log=False,
+            timeout_keep_alive=5,
+            h11_max_incomplete_event_size=1024 * 1024,
+            limit_concurrency=200,
+            limit_max_requests=10000,
         )
         self._server = uvicorn.Server(uvi_config)
         logger.info("API server starting on http://%s:%d", self.host, self.port)
@@ -314,20 +322,34 @@ class ApiServer:
             await self.db.close()
 
     def _setup_scheduler_jobs(self) -> None:
-        """Register background scheduler jobs."""
+        """Register background scheduler jobs.
+
+        Every job is wrapped in ``safe_run`` so exceptions and runaway
+        durations cannot crash or stall the scheduler loop.
+        """
+        from src.scheduler import safe_run
+
         config = load_config()
 
         if config.notifications.enabled:
-            self._scheduler.register("reminder_check", self._check_reminders, 60)
+            self._scheduler.register(
+                "reminder_check",
+                lambda: safe_run("reminder_check", self._check_reminders),
+                60,
+            )
 
         self._scheduler.register(
             "analytics_refresh",
-            self._refresh_analytics_periodic,
+            lambda: safe_run("analytics_refresh", self._refresh_analytics_periodic),
             config.analytics.refresh_interval_hours * 3600,
         )
 
         if config.series.heuristic_enabled:
-            self._scheduler.register("series_detect", self._run_series_detection, 86400)
+            self._scheduler.register(
+                "series_detect",
+                lambda: safe_run("series_detect", self._run_series_detection),
+                86400,
+            )
 
     async def _check_reminders(self) -> None:
         """Check for due reminders and overdue action items."""
@@ -399,22 +421,29 @@ class ApiServer:
         except Exception:
             logger.exception("Heuristic series detection failed")
 
+    async def _retention_cleanup_once(self) -> None:
+        """One pass of the retention cleanup, intended for ``safe_run``."""
+        config = load_config()
+        r = config.retention
+        if r.audio_retention_days > 0 or r.record_retention_days > 0:
+            result = await self.repo.cleanup_old_meetings(
+                r.audio_retention_days, r.record_retention_days
+            )
+            if result["audio_deleted"] or result["records_deleted"]:
+                logger.info("Periodic retention cleanup: %s", result)
+
     async def _periodic_retention_cleanup(self) -> None:
-        """Run data retention cleanup every 6 hours."""
+        """Run data retention cleanup every 6 hours.
+
+        Each pass is wrapped in ``safe_run`` so a slow DB query or
+        unexpected error never tears down the periodic loop.
+        """
+        from src.scheduler import safe_run
+
         interval = 6 * 3600  # 6 hours
         while True:
             await asyncio.sleep(interval)
-            try:
-                config = load_config()
-                r = config.retention
-                if r.audio_retention_days > 0 or r.record_retention_days > 0:
-                    result = await self.repo.cleanup_old_meetings(
-                        r.audio_retention_days, r.record_retention_days
-                    )
-                    if result["audio_deleted"] or result["records_deleted"]:
-                        logger.info("Periodic retention cleanup: %s", result)
-            except Exception as e:
-                logger.warning("Periodic retention cleanup failed: %s", e)
+            await safe_run("retention_cleanup", self._retention_cleanup_once)
 
     def _thread_target(self) -> None:
         """Target for the background thread."""
