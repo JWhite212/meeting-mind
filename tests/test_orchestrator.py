@@ -359,6 +359,73 @@ def test_notion_writer_failure_isolated(
 @patch("src.main.TeamsDetector")
 @patch("src.main.Transcriber")
 @patch("src.main.AudioCapture")
+def test_writer_last_error_emits_pipeline_warning(
+    mock_capture_cls,
+    mock_transcriber_cls,
+    mock_detector_cls,
+    mock_summariser_cls,
+    tmp_path,
+    audio_file,
+):
+    """When a writer returns with last_error set, the orchestrator emits
+    pipeline.warning so the UI can surface 'Markdown/Notion output skipped'.
+    """
+    from src.main import ContextRecall
+
+    log_dir = tmp_path / "logs"
+    log_dir.mkdir()
+    config = {
+        "detection": {"poll_interval_seconds": 1},
+        "audio": {"sample_rate": 16000, "temp_audio_dir": str(tmp_path / "audio")},
+        "transcription": {"model_size": "tiny.en"},
+        "summarisation": {"backend": "ollama"},
+        "markdown": {"enabled": True, "vault_path": str(tmp_path / "vault")},
+        "notion": {"enabled": True, "api_key": "fake", "database_id": "fake-db"},
+        "diarisation": {"enabled": False},
+        "api": {"enabled": False},
+        "logging": {"level": "WARNING", "log_file": str(log_dir / "test.log")},
+    }
+    config_path = tmp_path / "config.yaml"
+    config_path.write_text(yaml.dump(config))
+
+    with (
+        patch("src.main.MarkdownWriter") as mock_md_cls,
+        patch("src.main.NotionWriter") as mock_notion_cls,
+    ):
+        mock_md_writer = MagicMock()
+        mock_md_writer.write.return_value = None
+        mock_md_writer.last_error = "disk full"
+        mock_md_cls.return_value = mock_md_writer
+
+        mock_notion_writer = MagicMock()
+        mock_notion_writer.write.return_value = None
+        mock_notion_writer.last_error = "401 unauthorized"
+        mock_notion_cls.return_value = mock_notion_writer
+
+        app = ContextRecall(config_path=config_path)
+        app._transcriber.transcribe.return_value = _make_transcript()
+        app._summariser.summarise.return_value = _make_summary()
+
+        emitted = []
+        app._emit = lambda event_type, **kwargs: emitted.append((event_type, kwargs))
+
+        app._process_audio(audio_file, started_at=1000.0, duration_seconds=60.0)
+
+        warnings = [(t, k) for (t, k) in emitted if t == "pipeline.warning"]
+        sources = {k.get("source") for (_, k) in warnings}
+        assert "markdown" in sources
+        assert "notion" in sources
+
+        md_warning = next(k for (_, k) in warnings if k.get("source") == "markdown")
+        notion_warning = next(k for (_, k) in warnings if k.get("source") == "notion")
+        assert md_warning["message"] == "disk full"
+        assert notion_warning["message"] == "401 unauthorized"
+
+
+@patch("src.main.Summariser")
+@patch("src.main.TeamsDetector")
+@patch("src.main.Transcriber")
+@patch("src.main.AudioCapture")
 def test_audio_persistence_fallback_to_copy(
     mock_capture_cls,
     mock_transcriber_cls,

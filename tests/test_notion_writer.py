@@ -3,16 +3,43 @@
 import time
 from unittest.mock import MagicMock, patch
 
+import httpx
 import pytest
+from notion_client.errors import APIResponseError, HTTPResponseError
 
 from src.output.notion_writer import NotionWriter
 from src.summariser import MeetingSummary
 from src.transcriber import Transcript, TranscriptSegment
 from src.utils.config import NotionConfig
 
+
+def _http_error(status: int, *, retry_after: str | None = None) -> HTTPResponseError:
+    """Build a notion_client HTTPResponseError with the given status."""
+    headers_dict = {"Retry-After": retry_after} if retry_after else {}
+    return HTTPResponseError(
+        code="server_error",
+        status=status,
+        message=f"HTTP {status}",
+        headers=httpx.Headers(headers_dict),
+        raw_body_text="",
+    )
+
+
+def _api_error(status: int = 400) -> APIResponseError:
+    """Build a notion_client APIResponseError (4xx) for tests."""
+    return APIResponseError(
+        code="validation_error",
+        status=status,
+        message=f"HTTP {status}",
+        headers=httpx.Headers({}),
+        raw_body_text="",
+    )
+
+
 # ---------------------------------------------------------------------------
 # Helpers
 # ---------------------------------------------------------------------------
+
 
 def _make_writer(api_key: str = "", database_id: str = "") -> NotionWriter:
     """Create a NotionWriter with the given config overrides."""
@@ -161,24 +188,18 @@ class TestNotionWriter:
     def duration(self) -> float:
         return 1800.0
 
-    def test_missing_database_id_raises(
-        self, summary, transcript, started_at, duration
-    ):
+    def test_missing_database_id_raises(self, summary, transcript, started_at, duration):
         writer = _make_writer(api_key="some-key", database_id="")
         with pytest.raises(ValueError, match="database ID"):
             writer.write(summary, transcript, started_at, duration)
 
-    def test_missing_api_key_raises(
-        self, summary, transcript, started_at, duration
-    ):
+    def test_missing_api_key_raises(self, summary, transcript, started_at, duration):
         writer = _make_writer(api_key="", database_id="some-db-id")
         with pytest.raises(ValueError, match="API key"):
             writer.write(summary, transcript, started_at, duration)
 
     @patch("src.output.notion_writer.NotionClient")
-    def test_write_creates_page(
-        self, mock_client_cls, summary, transcript, started_at, duration
-    ):
+    def test_write_creates_page(self, mock_client_cls, summary, transcript, started_at, duration):
         mock_client = MagicMock()
         mock_client.pages.create.return_value = {
             "url": "https://notion.so/page-123",
@@ -198,9 +219,7 @@ class TestNotionWriter:
         assert "children" in call_kwargs.kwargs
 
     @patch("src.output.notion_writer.NotionClient")
-    def test_block_batching_over_100(
-        self, mock_client_cls, transcript, started_at, duration
-    ):
+    def test_block_batching_over_100(self, mock_client_cls, transcript, started_at, duration):
         # Build a summary whose markdown produces more than 100 blocks.
         lines = [f"- Item {i}" for i in range(150)]
         big_md = "\n".join(lines)
@@ -229,9 +248,7 @@ class TestNotionWriter:
         assert append_call.kwargs["block_id"] == "big-page-id"
 
     @patch("src.output.notion_writer.NotionClient")
-    def test_write_no_tags(
-        self, mock_client_cls, transcript, started_at, duration
-    ):
+    def test_write_no_tags(self, mock_client_cls, transcript, started_at, duration):
         summary = MeetingSummary(
             raw_markdown="## Summary\nNo tags here.",
             title="Tagless Meeting",
@@ -254,3 +271,164 @@ class TestNotionWriter:
 
         # Empty tags list should not produce a Tags multi_select property.
         assert "Tags" not in properties
+
+
+# ---------------------------------------------------------------------------
+# Retry / error handling tests
+# ---------------------------------------------------------------------------
+
+
+class TestNotionRetryAndErrorHandling:
+    """Tests for retry-on-5xx, Retry-After honour, and last_error stashing."""
+
+    @pytest.fixture
+    def summary(self) -> MeetingSummary:
+        return MeetingSummary(
+            raw_markdown="## Summary\nShort.",
+            title="Retry Test",
+            tags=["t"],
+        )
+
+    @pytest.fixture
+    def transcript(self) -> Transcript:
+        return Transcript(
+            segments=[TranscriptSegment(start=0.0, end=1.0, text="Hi.")],
+            language="en",
+            language_probability=0.99,
+            duration_seconds=1.0,
+        )
+
+    @pytest.fixture
+    def started_at(self) -> float:
+        return time.time()
+
+    @pytest.fixture
+    def duration(self) -> float:
+        return 60.0
+
+    @patch("src.output.notion_writer.time.sleep", return_value=None)
+    @patch("src.output.notion_writer.NotionClient")
+    def test_retries_on_5xx_then_succeeds(
+        self,
+        mock_client_cls,
+        _mock_sleep,
+        summary,
+        transcript,
+        started_at,
+        duration,
+    ):
+        """Transient 5xx errors retry and a later success is returned."""
+        mock_client = MagicMock()
+        mock_client.pages.create.side_effect = [
+            _http_error(500),
+            _http_error(503),
+            {"url": "https://notion.so/ok", "id": "ok-id"},
+        ]
+        mock_client_cls.return_value = mock_client
+
+        writer = _make_writer(api_key="k", database_id="db")
+        url = writer.write(summary, transcript, started_at, duration)
+
+        assert url == "https://notion.so/ok"
+        assert mock_client.pages.create.call_count == 3
+        assert writer.last_error is None
+
+    @patch("src.output.notion_writer.time.sleep", return_value=None)
+    @patch("src.output.notion_writer.NotionClient")
+    def test_5xx_exhausted_returns_none_and_sets_last_error(
+        self,
+        mock_client_cls,
+        _mock_sleep,
+        summary,
+        transcript,
+        started_at,
+        duration,
+    ):
+        """Exhausting retries on 5xx returns None and stashes last_error."""
+        mock_client = MagicMock()
+        mock_client.pages.create.side_effect = _http_error(502)
+        mock_client_cls.return_value = mock_client
+
+        writer = _make_writer(api_key="k", database_id="db")
+        url = writer.write(summary, transcript, started_at, duration)
+
+        assert url is None
+        assert mock_client.pages.create.call_count == 3
+        assert writer.last_error is not None
+        assert "502" in writer.last_error
+
+    @patch("src.output.notion_writer.time.sleep", return_value=None)
+    @patch("src.output.notion_writer.NotionClient")
+    def test_4xx_does_not_retry_and_stashes_last_error(
+        self,
+        mock_client_cls,
+        _mock_sleep,
+        summary,
+        transcript,
+        started_at,
+        duration,
+    ):
+        """4xx APIResponseError bypasses retry and is stashed on last_error."""
+        mock_client = MagicMock()
+        mock_client.pages.create.side_effect = _api_error(400)
+        mock_client_cls.return_value = mock_client
+
+        writer = _make_writer(api_key="k", database_id="db")
+        url = writer.write(summary, transcript, started_at, duration)
+
+        assert url is None
+        assert mock_client.pages.create.call_count == 1
+        assert writer.last_error is not None
+        assert "400" in writer.last_error
+
+    @patch("src.output.notion_writer.time.sleep", return_value=None)
+    @patch("src.output.notion_writer.NotionClient")
+    def test_429_honours_retry_after_header(
+        self,
+        mock_client_cls,
+        mock_sleep,
+        summary,
+        transcript,
+        started_at,
+        duration,
+    ):
+        """A 429 with Retry-After=N causes sleep(N) before the next attempt."""
+        mock_client = MagicMock()
+        mock_client.pages.create.side_effect = [
+            _http_error(429, retry_after="7"),
+            {"url": "https://notion.so/after-429", "id": "id-429"},
+        ]
+        mock_client_cls.return_value = mock_client
+
+        writer = _make_writer(api_key="k", database_id="db")
+        url = writer.write(summary, transcript, started_at, duration)
+
+        assert url == "https://notion.so/after-429"
+        mock_sleep.assert_any_call(7.0)
+        assert writer.last_error is None
+
+    @patch("src.output.notion_writer.time.sleep", return_value=None)
+    @patch("src.output.notion_writer.NotionClient")
+    def test_last_error_cleared_on_subsequent_success(
+        self,
+        mock_client_cls,
+        _mock_sleep,
+        summary,
+        transcript,
+        started_at,
+        duration,
+    ):
+        """A write() that succeeds clears last_error from a prior failure."""
+        mock_client = MagicMock()
+        mock_client.pages.create.return_value = {
+            "url": "https://notion.so/p",
+            "id": "p",
+        }
+        mock_client_cls.return_value = mock_client
+
+        writer = _make_writer(api_key="k", database_id="db")
+        writer.last_error = "old failure"
+        url = writer.write(summary, transcript, started_at, duration)
+
+        assert url == "https://notion.so/p"
+        assert writer.last_error is None

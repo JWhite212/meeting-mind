@@ -29,6 +29,10 @@ class MarkdownWriter:
 
     def __init__(self, config: MarkdownConfig):
         self._config = config
+        # Set when a filesystem error occurs during write(); the orchestrator
+        # reads this to emit a pipeline.warning so the UI can surface
+        # "Markdown output skipped: <reason>" instead of failing silently.
+        self.last_error: str | None = None
 
     def write(
         self,
@@ -36,14 +40,21 @@ class MarkdownWriter:
         transcript: Transcript,
         started_at: float,
         duration_seconds: float,
-    ) -> Path:
+    ) -> Path | None:
         """
         Write the meeting summary and transcript to a .md file.
 
-        Returns the path to the created file.
+        Returns the path to the created file, or ``None`` if a filesystem
+        error prevented the write (in which case ``last_error`` is set).
         """
+        self.last_error = None
         vault_path = Path(self._config.vault_path)
-        os.makedirs(vault_path, exist_ok=True)
+        try:
+            os.makedirs(vault_path, exist_ok=True)
+        except OSError as e:
+            self.last_error = f"Could not create vault directory {vault_path}: {e}"
+            logger.error("Markdown write failed: %s", self.last_error)
+            return None
 
         # Build the filename from the configured template.
         date_str = time.strftime("%Y-%m-%d", time.localtime(started_at))
@@ -110,7 +121,23 @@ class MarkdownWriter:
                 content_parts.append("")
 
         content = "\n".join(content_parts)
-        filepath.write_text(content, encoding="utf-8")
+
+        # Atomic write: stream to a sibling temp file then os.replace() in
+        # place. Prevents partial files if the daemon is killed mid-write or
+        # the disk fills up between bytes.
+        tmp_path = filepath.with_name(filepath.name + ".tmp")
+        try:
+            tmp_path.write_text(content, encoding="utf-8")
+            os.replace(tmp_path, filepath)
+        except OSError as e:
+            self.last_error = f"Could not write markdown file {filepath}: {e}"
+            logger.error("Markdown write failed: %s", self.last_error)
+            # Best-effort cleanup of the temp file; ignore secondary errors.
+            try:
+                tmp_path.unlink(missing_ok=True)
+            except OSError:
+                pass
+            return None
 
         logger.info("Markdown written: %s", filepath)
         return filepath

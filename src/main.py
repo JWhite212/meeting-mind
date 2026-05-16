@@ -705,21 +705,29 @@ class ContextRecall:
         # Step 4: Write outputs.
         self._emit("pipeline.stage", meeting_id=meeting_id, stage="writing")
 
-        if self._md_writer:
+        # Each writer stashes recoverable failures on its `last_error`
+        # attribute (filesystem errors for markdown; 4xx or exhausted-retry
+        # 5xx/429 for notion). Surface those as pipeline.warning so the UI
+        # can show "<source> output skipped: <reason>" instead of failing
+        # silently.
+        for source, writer in (
+            ("markdown", self._md_writer),
+            ("notion", self._notion_writer),
+        ):
+            if writer is None:
+                continue
             try:
-                md_path = self._md_writer.write(summary, transcript, started_at, duration_seconds)
-                logger.info("Markdown output: %s", md_path)
+                result = writer.write(summary, transcript, started_at, duration_seconds)
+                logger.info("%s output: %s", source.capitalize(), result)
             except Exception as e:
-                logger.error("Markdown write failed: %s", e, exc_info=True)
-
-        if self._notion_writer:
-            try:
-                page_url = self._notion_writer.write(
-                    summary, transcript, started_at, duration_seconds
+                logger.error("%s write failed: %s", source.capitalize(), e, exc_info=True)
+            if writer.last_error:
+                self._emit(
+                    "pipeline.warning",
+                    meeting_id=meeting_id,
+                    source=source,
+                    message=str(writer.last_error),
                 )
-                logger.info("Notion output: %s", page_url)
-            except Exception as e:
-                logger.error("Notion write failed: %s", e, exc_info=True)
 
         self._emit("pipeline.complete", meeting_id=meeting_id, title=summary.title)
 
