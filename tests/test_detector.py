@@ -94,9 +94,12 @@ class TestDetectorStateMachine:
     @patch("src.detector.time")
     def test_meeting_end_fires_callback(self, mock_time, detection_config, fake_platform):
         # Simulate a meeting that lasts long enough.
-        # time.time() calls: cooldown_check, cooldown_check, started_at,
-        # ended_at, cooldown_set
-        mock_time.time.side_effect = [0.0, 0.0, 100.0, 200.0, 200.0]
+        # time.time() calls:
+        # tick1 (IDLE, active):   cooldown_check
+        # tick2 (IDLE, active):   cooldown_check, started_at
+        # tick3 (ACTIVE, ¬act):   ending_started_at, ending_elapsed
+        # tick4 (ACTIVE, ¬act):   ending_elapsed, ended_at, cooldown_set
+        mock_time.time.side_effect = [0.0, 0.0, 100.0, 199.0, 199.0, 200.0, 200.0, 200.0]
 
         detector = TeamsDetector(detection_config, platform=fake_platform)
         end_cb = MagicMock()
@@ -121,9 +124,12 @@ class TestDetectorStateMachine:
     @patch("src.detector.time")
     def test_short_meeting_discarded(self, mock_time, detection_config, fake_platform):
         # started_at=100, ended_at=105 → duration 5s, below min 10s.
-        # time.time() calls: cooldown_check, cooldown_check, started_at,
-        # ended_at, cooldown_set
-        mock_time.time.side_effect = [0.0, 0.0, 100.0, 105.0, 105.0]
+        # time.time() calls:
+        # tick1 (IDLE, active):   cooldown_check
+        # tick2 (IDLE, active):   cooldown_check, started_at
+        # tick3 (ACTIVE, ¬act):   ending_started_at, ending_elapsed
+        # tick4 (ACTIVE, ¬act):   ending_elapsed, ended_at, cooldown_set
+        mock_time.time.side_effect = [0.0, 0.0, 100.0, 104.0, 104.0, 105.0, 105.0, 105.0]
 
         detector = TeamsDetector(detection_config, platform=fake_platform)
         end_cb = MagicMock()
@@ -181,9 +187,21 @@ class TestDetectorStateMachine:
     def test_callback_receives_correct_event_fields(
         self, mock_time, detection_config, fake_platform
     ):
-        # time.time() calls: cooldown_check, cooldown_check, started_at,
-        # ended_at, cooldown_set
-        mock_time.time.side_effect = [0.0, 0.0, 1000.0, 1060.0, 1060.0]
+        # time.time() calls:
+        # tick1 (IDLE, active):   cooldown_check
+        # tick2 (IDLE, active):   cooldown_check, started_at=1000
+        # tick3 (ACTIVE, ¬act):   ending_started_at=1059, ending_elapsed
+        # tick4 (ACTIVE, ¬act):   ending_elapsed, ended_at=1060, cooldown_set
+        mock_time.time.side_effect = [
+            0.0,
+            0.0,
+            1000.0,
+            1059.0,
+            1059.0,
+            1060.0,
+            1060.0,
+            1060.0,
+        ]
 
         detector = TeamsDetector(detection_config, platform=fake_platform)
         start_cb = MagicMock()
@@ -215,9 +233,12 @@ class TestDetectorStateMachine:
 
     @patch("src.detector.time")
     def test_state_returns_to_idle_after_end(self, mock_time, detection_config, fake_platform):
-        # time.time() calls: cooldown_check, cooldown_check, started_at,
-        # ended_at, cooldown_set
-        mock_time.time.side_effect = [0.0, 0.0, 100.0, 200.0, 200.0]
+        # time.time() calls:
+        # tick1 (IDLE, active):   cooldown_check
+        # tick2 (IDLE, active):   cooldown_check, started_at
+        # tick3 (ACTIVE, ¬act):   ending_started_at, ending_elapsed
+        # tick4 (ACTIVE, ¬act):   ending_elapsed, ended_at, cooldown_set
+        mock_time.time.side_effect = [0.0, 0.0, 100.0, 199.0, 199.0, 200.0, 200.0, 200.0]
 
         detector = TeamsDetector(detection_config, platform=fake_platform)
 
@@ -356,9 +377,13 @@ class TestDetectorRunLoop:
 
     @patch("src.detector.time")
     def test_end_callback_exception_stops_loop(self, mock_time, detection_config, fake_platform):
-        # time.time() calls: cooldown_check, cooldown_check, started_at,
-        # ended_at (callback raises before cooldown_set)
-        mock_time.time.side_effect = [0.0, 0.0, 100.0, 200.0]
+        # time.time() calls:
+        # tick1 (IDLE, active):   cooldown_check
+        # tick2 (IDLE, active):   cooldown_check, started_at
+        # tick3 (ACTIVE, ¬act):   ending_started_at, ending_elapsed
+        # tick4 (ACTIVE, ¬act):   ending_elapsed, ended_at (callback raises
+        #                         before cooldown_set runs)
+        mock_time.time.side_effect = [0.0, 0.0, 100.0, 199.0, 199.0, 200.0, 200.0]
 
         detector = TeamsDetector(detection_config, platform=fake_platform)
         end_cb = MagicMock(side_effect=RuntimeError("end callback failed"))
@@ -394,20 +419,32 @@ class TestDetectorRapidOscillation:
 
     @patch("src.detector.time")
     def test_rapid_oscillation_no_state_leak(self, mock_time, detection_config, fake_platform):
-        # Provide timestamps for two full start/end cycles.
-        # Each cycle: cooldown_check, cooldown_check, started_at,
-        # ended_at, cooldown_set
+        # Provide timestamps for two full start/end cycles. Each cycle:
+        # tick1 (IDLE, active):   cooldown_check
+        # tick2 (IDLE, active):   cooldown_check, started_at
+        # tick3 (ACTIVE, ¬act):   ending_started_at, ending_elapsed
+        # tick4 (ACTIVE, ¬act):   ending_elapsed, ended_at, cooldown_set
+        # Cycle 2 has one extra "stale positive" tick that the test
+        # asserts must NOT start a meeting (1 cooldown_check call).
         mock_time.time.side_effect = [
-            0.0,
-            0.0,
-            100.0,
-            200.0,
-            200.0,  # Cycle 1
-            201.0,
-            201.0,
-            300.0,
-            400.0,
-            400.0,  # Cycle 2
+            # Cycle 1
+            0.0,  # tick1 cooldown
+            0.0,  # tick2 cooldown
+            100.0,  # tick2 started_at
+            199.0,  # tick3 ending_started_at
+            199.0,  # tick3 ending_elapsed
+            200.0,  # tick4 ending_elapsed
+            200.0,  # tick4 ended_at
+            200.0,  # tick4 cooldown_set
+            # Cycle 2
+            201.0,  # IDLE tick (active) cooldown
+            201.0,  # IDLE tick (active) cooldown
+            300.0,  # IDLE tick (active) started_at
+            399.0,  # ACTIVE tick (¬act) ending_started_at
+            399.0,  # ACTIVE tick (¬act) ending_elapsed
+            400.0,  # ACTIVE tick (¬act) ending_elapsed
+            400.0,  # ACTIVE tick (¬act) ended_at
+            400.0,  # ACTIVE tick (¬act) cooldown_set
         ]
 
         detector = TeamsDetector(detection_config, platform=fake_platform)
@@ -479,22 +516,24 @@ class TestDetectorCooldown:
         detector.on_meeting_end = end_cb
 
         # time.time() calls in _tick():
-        # tick1 (active, IDLE): cooldown check (0 < 0 → pass), consec=1
-        # tick2 (active, IDLE): cooldown check, consec=2 → started_at
-        # tick3 (not active, ACTIVE): ended_at, consec_end=1
-        # tick4 (not active, ACTIVE): ended_at, duration check → end,
-        #        then cooldown_until = time() + 60
-        # tick5 (active, IDLE): cooldown check → still in cooldown
-        # tick6 (active, IDLE): cooldown check → still in cooldown
+        # tick1 (IDLE, active):       cooldown_check (0 < 0 → pass)
+        # tick2 (IDLE, active):       cooldown_check, started_at
+        # tick3 (ACTIVE, ¬act):       ending_started_at, ending_elapsed
+        # tick4 (ACTIVE, ¬act):       ending_elapsed, ended_at,
+        #                             cooldown_set = time() + 60
+        # tick5 (IDLE, active):       cooldown_check (still in cooldown)
+        # tick6 (IDLE, active):       cooldown_check (still in cooldown)
         mock_time.time.side_effect = [
-            0.0,
-            0.0,
-            100.0,  # tick1 cooldown, tick2 cooldown+started_at
-            200.0,  # tick3 ended_at (consec_end=1)
-            200.0,
-            200.0,  # tick4 ended_at (consec_end=2), cooldown_until
-            210.0,  # tick5 cooldown check (210 < 260)
-            215.0,  # tick6 cooldown check (215 < 260)
+            0.0,  # tick1 cooldown_check
+            0.0,  # tick2 cooldown_check
+            100.0,  # tick2 started_at
+            199.0,  # tick3 ending_started_at
+            199.0,  # tick3 ending_elapsed
+            200.0,  # tick4 ending_elapsed
+            200.0,  # tick4 ended_at
+            200.0,  # tick4 cooldown_set (260 = 200 + 60)
+            210.0,  # tick5 cooldown_check (210 < 260)
+            215.0,  # tick6 cooldown_check (215 < 260)
         ]
 
         # --- Start and end a meeting ---
@@ -519,6 +558,123 @@ class TestDetectorCooldown:
         detector._tick()  # 215 < 260 -> ignored
         assert detector.state == MeetingState.IDLE
         assert start_cb.call_count == 1  # No new meeting started.
+
+    @patch("src.detector.time")
+    def test_ending_cooldown_commits_after_10s_even_without_enough_polls(
+        self, mock_time, fake_platform
+    ):
+        """A single false-negative poll must not bounce the state
+        machine. But after the 10-second ENDING window has elapsed
+        with the meeting still inactive, ENDING must commit even if
+        ``required_consecutive_end_detections`` has not been reached."""
+        config = DetectionConfig(
+            poll_interval_seconds=0,
+            min_meeting_duration_seconds=0,
+            required_consecutive_detections=2,
+            # Set absurdly high so the *only* way to commit ENDING is
+            # via the 10-second elapsed-time path.
+            required_consecutive_end_detections=999,
+            min_gap_before_new_meeting=0,
+        )
+        detector = TeamsDetector(config, platform=fake_platform)
+        end_cb = MagicMock()
+        detector.on_meeting_end = end_cb
+
+        # time.time() ledger:
+        # tick1 (IDLE, active):   cooldown_check=0
+        # tick2 (IDLE, active):   cooldown_check=0, started_at=100
+        # tick3 (ACTIVE, ¬act):   ending_started_at=200, ending_elapsed (0s)
+        # tick4 (ACTIVE, ¬act):   ending_elapsed (10s exactly) → COMMIT,
+        #                         ended_at=210, cooldown_set=210
+        mock_time.time.side_effect = [
+            0.0,
+            0.0,
+            100.0,
+            200.0,
+            200.0,
+            210.0,
+            210.0,
+            210.0,
+        ]
+
+        fake_platform.app_running = True
+        fake_platform.audio_active = True
+        detector._tick()
+        detector._tick()
+        assert detector.state == MeetingState.ACTIVE
+
+        fake_platform.app_running = False
+        fake_platform.audio_active = False
+        detector._tick()
+        # First negative poll: timer seeded, no commit yet.
+        assert detector.state == MeetingState.ACTIVE
+        end_cb.assert_not_called()
+
+        detector._tick()
+        # Second negative poll, 10s elapsed — commit even though
+        # required_consecutive_end_detections (999) is nowhere near.
+        end_cb.assert_called_once()
+        assert detector.state == MeetingState.IDLE
+
+    @patch("src.detector.time")
+    def test_ending_cooldown_resets_when_meeting_resumes(self, mock_time, fake_platform):
+        """If the meeting flips back to active during the 10-second
+        window, the ENDING cooldown must reset so a fresh negative
+        sequence has to start from scratch."""
+        config = DetectionConfig(
+            poll_interval_seconds=0,
+            min_meeting_duration_seconds=0,
+            required_consecutive_detections=2,
+            required_consecutive_end_detections=999,
+            min_gap_before_new_meeting=0,
+        )
+        detector = TeamsDetector(config, platform=fake_platform)
+        end_cb = MagicMock()
+        detector.on_meeting_end = end_cb
+
+        # time.time() ledger:
+        # tick1 (IDLE, active):     cooldown_check=0
+        # tick2 (IDLE, active):     cooldown_check=0, started_at=100
+        # tick3 (ACTIVE, ¬act):     ending_started_at=200, ending_elapsed=0
+        # tick4 (ACTIVE, active):   (no time.time calls — just reset)
+        # tick5 (ACTIVE, ¬act):     ending_started_at=205, ending_elapsed=0
+        # tick6 (ACTIVE, ¬act):     ending_elapsed=4 (<10, no commit)
+        mock_time.time.side_effect = [
+            0.0,  # tick1 cooldown
+            0.0,  # tick2 cooldown
+            100.0,  # tick2 started_at
+            200.0,  # tick3 ending_started_at
+            200.0,  # tick3 ending_elapsed
+            205.0,  # tick5 ending_started_at (fresh)
+            205.0,  # tick5 ending_elapsed
+            209.0,  # tick6 ending_elapsed (only 4s after fresh start)
+        ]
+
+        fake_platform.app_running = True
+        fake_platform.audio_active = True
+        detector._tick()
+        detector._tick()
+        assert detector.state == MeetingState.ACTIVE
+
+        # First negative: timer seeded at 200.
+        fake_platform.app_running = False
+        fake_platform.audio_active = False
+        detector._tick()
+
+        # Meeting flips back to active — timer should reset.
+        fake_platform.app_running = True
+        fake_platform.audio_active = True
+        detector._tick()
+
+        # New negative sequence starts: timer seeded at 205.
+        fake_platform.app_running = False
+        fake_platform.audio_active = False
+        detector._tick()
+        detector._tick()
+        # Only 4 simulated seconds elapsed since the *fresh* timer
+        # started — must NOT have committed yet.
+        end_cb.assert_not_called()
+        assert detector.state == MeetingState.ACTIVE
 
     def test_new_meeting_detected_after_cooldown_expires(self, fake_platform):
         """After the cooldown period expires, new meetings should be

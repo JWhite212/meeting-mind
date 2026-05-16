@@ -72,6 +72,11 @@ class TeamsDetector:
         self._consecutive_detections: int = 0
         self._consecutive_end_detections: int = 0
         self._cooldown_until: float = 0.0
+        # Tracks when the current ACTIVE → ENDING transition began so
+        # a single false-negative poll can't bounce the state machine
+        # straight back to ACTIVE. Reset to 0.0 whenever ENDING completes
+        # or the meeting goes positive again.
+        self._ending_started_at: float = 0.0
 
         # Callbacks — set these from the orchestrator.
         self.on_meeting_start: Callable[[MeetingEvent], None] = lambda event: None
@@ -145,11 +150,19 @@ class TeamsDetector:
         elif self._state == MeetingState.ACTIVE:
             if not meeting_active:
                 self._consecutive_end_detections += 1
+                if self._ending_started_at == 0.0:
+                    self._ending_started_at = time.time()
+
                 required_end = self._config.required_consecutive_end_detections
-                if self._consecutive_end_detections >= required_end:
+                ending_elapsed = time.time() - self._ending_started_at
+                commit_end = (
+                    self._consecutive_end_detections >= required_end or ending_elapsed >= 10.0
+                )
+                if commit_end:
                     ended_at = time.time()
                     duration = ended_at - self._meeting_started_at
                     self._consecutive_end_detections = 0
+                    self._ending_started_at = 0.0
 
                     if duration < self._config.min_meeting_duration_seconds:
                         logger.info(
@@ -173,12 +186,16 @@ class TeamsDetector:
                     self._meeting_started_at = 0.0
                 else:
                     logger.debug(
-                        "Possible meeting end (%d/%d confirmations)",
+                        "Possible meeting end (%d/%d confirmations, %.1fs elapsed)",
                         self._consecutive_end_detections,
                         required_end,
+                        ending_elapsed,
                     )
             else:
+                # Meeting flipped back to active — abandon the ENDING
+                # cooldown so a fresh negative sequence starts from zero.
                 self._consecutive_end_detections = 0
+                self._ending_started_at = 0.0
 
     # ------------------------------------------------------------------
     # Public interface

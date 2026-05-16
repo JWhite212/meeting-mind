@@ -10,6 +10,17 @@ import sys
 from typing import Protocol, runtime_checkable
 
 
+class DetectorError(RuntimeError):
+    """Raised when a platform detector cannot run because of a
+    misconfigured environment (e.g. a required binary like ``pgrep``,
+    ``lsof`` or ``osascript`` is missing from ``PATH``).
+
+    Callers should treat this as a hard configuration failure rather
+    than a transient detection miss — silently returning ``False``
+    here would let a meeting go un-recorded.
+    """
+
+
 @runtime_checkable
 class PlatformDetector(Protocol):
     """Interface for platform-specific meeting detection."""
