@@ -16,6 +16,22 @@ logger = logging.getLogger("contextrecall.scheduler")
 Job = Callable[[], Awaitable[None]]
 
 
+async def safe_run(name: str, coro_fn: Job, timeout: float = 60.0) -> None:
+    """Run ``coro_fn`` with a timeout, swallowing exceptions and logging them.
+
+    Used to wrap periodic scheduler jobs so a single misbehaving task can
+    neither stall the scheduler loop indefinitely nor crash it.
+    """
+    try:
+        await asyncio.wait_for(coro_fn(), timeout=timeout)
+    except asyncio.TimeoutError:
+        logger.warning("Scheduled job '%s' timed out after %.1fs", name, timeout)
+    except asyncio.CancelledError:
+        raise
+    except Exception:
+        logger.exception("Scheduled job '%s' failed", name)
+
+
 @dataclass
 class _RegisteredJob:
     name: str
